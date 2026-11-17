@@ -577,6 +577,12 @@ class Binder extends Component {
     if (ex < smin) smin = ex; if (ex > smax) smax = ex;
     return { strips: out, zmax, smin, smax };
   }
+  edges(n, sign, cx, cy) {
+    const parts = [];
+    for (let e = 1; e <= n; e++) parts.push(`${sign * e * 1.5}px ${Math.round(e * 0.5)}px 0 ${e % 2 ? '#cfcfcc' : '#fbfbf9'}`);
+    parts.push(`${cx + sign * n * 1.5}px ${cy + Math.round(n * 0.5)}px ${3 + n * 0.5}px rgba(0,0,0,.4)`);
+    return parts.join(', ');
+  }
   stripCss(g) { return `transform:translate3d(${g.x.toFixed(2)}px,0,${g.z.toFixed(2)}px) rotateY(${(-g.th).toFixed(4)}rad)`; }
   paint(dir, t) {
     const root = this.root; if (!root) return false;
@@ -591,6 +597,16 @@ class Binder extends Component {
       els[i].style.transform = `translate3d(${g.x.toFixed(2)}px,0,${g.z.toFixed(2)}px) rotateY(${(-g.th).toFixed(4)}rad)`;
       if (fs[i]) fs[i].style.background = `linear-gradient(90deg,${tone(fr(g.a))},${tone(fr(g.b))})`;
       if (bs[i]) bs[i].style.background = `linear-gradient(90deg,${tone(bk(g.b))},${tone(bk(g.a))})`;
+    }
+    const f = this.state.flip, nb = f ? Math.abs(f.b - f.a) : 0;
+    if (nb > 1) {
+      // the block's page edges leave one stack as it lifts and join the other as it lands
+      const cl = (v) => v < 0 ? 0 : v > 1 ? 1 : v, lo = Math.min(f.a, f.b), hi = Math.max(f.a, f.b), sheets = this.spreads - 1;
+      const last = G.strips[G.strips.length - 1], te = dir === 'B' ? Math.PI - last.b : last.b, q = Math.PI / 4;
+      const on = Math.round(nb * cl(1 - te / q)), off = Math.round(nb * cl((te - 3 * q) / q));
+      const r = root.querySelector('.stkR'), l = root.querySelector('.stkL');
+      if (r) r.style.boxShadow = this.edges(sheets - hi + (dir === 'F' ? on : off), 1, 2, 2);
+      if (l) l.style.boxShadow = this.edges(lo + (dir === 'B' ? on : off), -1, 1, 2);
     }
     if (cast) {
       const lift = Math.min(1, G.zmax / 160);
@@ -840,12 +856,9 @@ class Binder extends Component {
     }
     // page edges: left = sheets already turned, right = sheets still to come
     const sheets = this.spreads - 1, lo = tlo, hi = thi;
-    const edges = (n, sign, cx, cy) => {
-      const parts = [];
-      for (let e = 1; e <= n; e++) parts.push(`${sign * e * 1.5}px ${Math.round(e * 0.5)}px 0 ${e % 2 ? '#cfcfcc' : '#fbfbf9'}`);
-      parts.push(`${cx + sign * n * 1.5}px ${cy + Math.round(n * 0.5)}px ${3 + n * 0.5}px rgba(0,0,0,.4)`);
-      return parts.join(', ');
-    };
+    const edges = this.edges, nb = f ? Math.abs(f.b - f.a) : 0;
+    // a block turning together keeps its page edges in the stack it's lying on until it lifts away
+    const rN = sheets - hi + (nb > 1 && f.dir === 'F' ? nb : 0), lN = lo + (nb > 1 && f.dir === 'B' ? nb : 0);
     // right stack, deepest first: back cover, then each sheet's underside, tab, top side
     let rS = [], lS = [];
     const sl = this.spreads - 1, hs = st.open ? hi : 0;
@@ -898,7 +911,7 @@ class Binder extends Component {
 
           ${showPlaybill ? html`<button class="peek" onClick=${() => this.setState({ pop: 'playbill' })} aria-label="Pull out the show program" data-hint="Pull out the program"><span style="display:block;height:30px;background:#14171a;color:#fff;font-size:11px;letter-spacing:.34em;line-height:30px;text-align:center">PROGRAM</span></button>` : null}
 
-          <div class="paper" style=${`position:absolute;left:520px;top:18px;width:494px;height:644px;border-radius:0 2px 2px 0;box-shadow:${edges(sheets - hi, 1, 2, 2)};clip-path:inset(-400px -400px -400px 0)`}>
+          <div class="paper stkR" style=${`position:absolute;left:520px;top:18px;width:494px;height:644px;border-radius:0 2px 2px 0;box-shadow:${edges(rN, 1, 2, 2)};clip-path:inset(-400px -400px -400px 0)`}>
             ${this.pageBody(R, 'R', st.open && !f)}
             ${rDecals.map((d) => this.decal(d, true))}
             <div class="litR" aria-hidden="true"></div>
@@ -924,7 +937,7 @@ class Binder extends Component {
               <div aria-hidden="true" style="position:absolute;inset:0;overflow:hidden;border-radius:16px 6px 6px 16px;pointer-events:none"><span style=${'position:absolute;' + this.litCss(ox, 96)}></span></div>
               <div aria-hidden="true" style="position:absolute;inset:9px;border:1.5px dashed rgba(150,148,140,.5);border-radius:10px 3px 3px 10px"></div>
               <div class="gl">${this.stack(lS, 'L')}</div>
-              <div class="paper" style=${`position:absolute;left:26px;top:18px;width:494px;height:644px;border-radius:2px 0 0 2px;box-shadow:${edges(lo, -1, 1, 2)};clip-path:inset(-400px 0 -400px -400px)`}>
+              <div class="paper stkL" style=${`position:absolute;left:26px;top:18px;width:494px;height:644px;border-radius:2px 0 0 2px;box-shadow:${edges(lN, -1, 1, 2)};clip-path:inset(-400px 0 -400px -400px)`}>
                 ${this.pageBody(L, 'L', st.open && !f)}
                 ${lDecals.map((d) => this.decal(d, true))}
                 <div class="litL" aria-hidden="true"></div>

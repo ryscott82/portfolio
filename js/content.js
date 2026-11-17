@@ -1,6 +1,7 @@
 // Everything the binder says lives in this file. Edit text here; the layout follows.
 //
-// Page fields:  kicker, title, lead (bold one-line takeaway), tags, slug (link name, e.g. #theater), blocks
+// Page fields:  kicker, title, lead (bold one-line takeaway), logo, slug (link name, e.g. #theater), blocks
+// Logos:        babson, wholefoods, ftc, frc, rmhc (files in assets/logos/) — on a page or an entry ({..., logo: 'babson'})
 // Block types:  entry {h, meta, body}   text {body}        photo {src, alt, [w, h, rot, tap]} — taped in; visitors can peel it off
 //
 //               role {h, meta}          list {h, items}    links {h, items: [[label, url]]}
@@ -17,7 +18,7 @@ export const CONTACT = {
 };
 
 const P = (name, alt) => ({ type: 'photo', src: 'assets/photos/' + name + '.jpg', alt, contain: name === 'mela' });
-const E = (h, meta, body) => ({ type: 'entry', h, meta: meta || '', body: body || '' });
+const E = (h, meta, body, logo) => ({ type: 'entry', h, meta: meta || '', body: body || '', logo });
 const T = (body) => ({ type: 'text', body });
 const R = (h, meta) => ({ type: 'role', h, meta });
 
@@ -37,15 +38,15 @@ export const SECTIONS = [
       { type: 'links', h: 'Résumé', items: [['Download my résumé (PDF)', CONTACT.resume]] }
     ] },
     { blocks: [
-      E('Weissman Foundry', 'Babson College', 'Teaching students the product development cycle and advanced manufacturing techniques.'),
+      E('Weissman Foundry', 'Babson College', 'Teaching students the product development cycle and advanced manufacturing techniques.', 'babson'),
       E('MySTEM Academy', '', 'Leading 3rd–7th graders through the journey of Scratch and Python programming.'),
-      E('Whole Foods Market', 'E-Commerce Team Member', '')
+      E('Whole Foods Market', 'E-Commerce Team Member', '', 'wholefoods')
     ] }
   ] },
   { label: 'Education', sub: 'Babson College, Pine-Richland / Sewickley', pages: [
     { kicker: 'Section 03', title: 'Education', slug: 'education', blocks: [P('edu', 'Babson College campus from above')] },
     { blocks: [
-      E('Babson College', 'Bachelor of Science in Business Administration', 'Concentrating in Strategy and Consulting.'),
+      E('Babson College', 'Bachelor of Science in Business Administration', 'Concentrating in Strategy and Consulting.', 'babson'),
       E('High School', 'Pine-Richland / Sewickley Academy · Class of 2024', '')
     ] }
   ] },
@@ -61,11 +62,9 @@ export const SECTIONS = [
     ] },
     { kicker: 'Projects', title: 'Mela-Know-More', slug: 'mela-know-more',
       lead: 'Melanoma risk analysis software that won the CONNECT Award at the FIRST World Championship.',
-      tags: ['Software', 'AI', 'Healthcare'],
       blocks: [P('mela', 'Mela-Know-More project poster: mission, technology and feedback from experts')] },
-    { kicker: 'Projects · FTC Teams 8393 and 6931', title: 'FIRST Tech Challenge', slug: 'ftc',
+    { kicker: 'Projects · FTC Teams 8393 and 6931', title: 'FIRST Tech Challenge', slug: 'ftc', logo: 'ftc',
       lead: 'Six seasons of competitive robotics, with a First Place CONNECT Award at Worlds.',
-      tags: ['Engineering', 'Teamwork'],
       blocks: [
         R('2023–2024', 'PA State Championship · First Place THINK Award'),
         R('2022–2023', 'World Championship · Top Seeded Finalist Alliance'),
@@ -74,9 +73,8 @@ export const SECTIONS = [
         R('2019–2020', 'Virginia State Championship · First Place Compass Award'),
         R('2018–2019', 'PA State Championship · Winning Alliance, then Worlds')
       ] },
-    { kicker: 'Projects · FRC Team 8393', title: 'FIRST Robotics Competition', slug: 'frc',
+    { kicker: 'Projects · FRC Team 8393', title: 'FIRST Robotics Competition', slug: 'frc', logo: 'frc',
       lead: 'A rookie team that competed at the FIRST World Championship in its first year.',
-      tags: ['Engineering', 'Outreach'],
       blocks: [
         E('2023 · Rookie year', 'Rochester and Pittsburgh Regionals', 'Rookie All-Star Award; Captain of the Finalist Alliance; Highest Rookie Seed; Team Sustainability Award. Qualified for and competed at the FIRST World Championship.'),
         E('2024', 'Pittsburgh and Miami Valley Regionals, World Championship', 'Engineering Inspiration Award; IMPACT Award; callback judging for Engineering Inspiration at Worlds (top 4 teams).')
@@ -88,7 +86,6 @@ export const SECTIONS = [
     ] },
     { kicker: 'Community', title: 'U-Prep 4 Life Pathway', slug: 'u-prep-4-life',
       lead: 'A guaranteed high school to STEM career pathway for students in Allegheny public housing.',
-      tags: ['Teaching', 'Curriculum design', 'Partnerships'],
       blocks: [
         { type: 'list', h: 'What I did', items: [
           'Created an 8-module supplemental high school computer science curriculum, with slideshows and class activities',
@@ -99,14 +96,12 @@ export const SECTIONS = [
       ] },
     { kicker: 'Community', title: 'Haitian Relief', slug: 'haitian-relief',
       lead: 'Raised over $7,000 for a traveling clinic that has treated 252 patients in 3 villages.',
-      tags: ['Fundraising', 'Leadership'],
       blocks: [
         T('My friends and I wanted to help people in Haiti, living in a gang-run environment. I first wanted to start STEM classes, but experts told us food, water and health were more pressing: there is no running water or electricity, and infrastructure could not be imported.'),
         T('So we held a community bingo night to fund the clinic, and sent 10 local farmers for training on improving harvest yield and quality.')
       ] },
-    { kicker: 'Community', title: 'Ronald McDonald House', slug: 'ronald-mcdonald-house',
+    { kicker: 'Community', title: 'Ronald McDonald House', slug: 'ronald-mcdonald-house', logo: 'rmhc',
       lead: 'Built 20 STEM activity stations for the families of hospitalized children.',
-      tags: ['Program design', 'Community'],
       blocks: [
         T('Extended hospitalization affects entire families, so I led a program with the Ronald McDonald House: electronics learning labs, LEGO, snap circuits and marble races for young family members of every age.'),
         T('The local director told us, “No one ever thinks about the families.”')
@@ -116,7 +111,6 @@ export const SECTIONS = [
     { kicker: 'Section 06', title: 'The Arts', slug: 'arts', blocks: [P('arts', 'Ryan singing on stage'), T('Babson Players · President')] },
     { kicker: 'The Arts', title: 'Theater', slug: 'theater',
       lead: '13 roles across school, community and regional stages.',
-      tags: ['Performance', 'Voice', 'Dance'],
       blocks: [
         R('Richard Stanley', 'The Man Who Came To Dinner · Pine-Richland, 2023'),
         R('Javert', 'Les Misérables · Comtra Theater, 2022'),

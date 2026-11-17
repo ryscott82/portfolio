@@ -14,10 +14,16 @@ const ARROW_L = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none"
 const META = {
   a: { w: 190, h: 190, rot: -7, z: 14 }, b: { w: 170, h: 170, rot: 6, z: 14 }, st: { w: 128, h: 128, rot: -11, z: 4 },
   c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 },
-  fr: { w: 378, h: 213, rot: 50, z: 97, thick: true } // Focusrite interface: a real box, 1.8 in (~97 units) tall, front facing the binder
+  fr: { w: 378, h: 213, rot: 20, z: 97, thick: true } // Focusrite interface: a real box, 1.8 in (~97 units) tall, front facing the binder
 };
 const BASE_ORDER = ['a', 'b', 'st', 'c3', 'c2', 'c1'];
 const FOCUSRITE = 'assets/photos/focusrite.webp';
+const LOGOS = { babson: [600, 75], wholefoods: [240, 240], ftc: [305, 240], frc: [350, 240], rmhc: [158, 240] };
+const LOGO_NAMES = { babson: 'Babson College', wholefoods: 'Whole Foods Market', ftc: 'FIRST Tech Challenge', frc: 'FIRST Robotics Competition', rmhc: 'Ronald McDonald House' };
+function Logo({ name, h }) {
+  const d = LOGOS[name]; if (!d) return null;
+  return html`<${Pic} src=${'assets/logos/' + name + '.png'} alt=${LOGO_NAMES[name] + ' logo'} fit="contain" cls="logo" style=${`width:${Math.round(d[0] * h / d[1])}px;height:${h}px;background-color:transparent;flex:none`} />`;
+}
 
 // Photos are painted as backgrounds rather than image elements, so they can't be dragged off the page,
 // copied or saved from the right-click menu. They still carry a text label for screen readers.
@@ -170,6 +176,12 @@ class Binder extends Component {
     if (want && location.hash !== want) { try { history.replaceState(null, '', want); } catch (e) { /* ignore */ } }
     if (this.isMobile()) { const t = document.querySelector('.m-tab.on'); if (t && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', inline: 'center' }); }
   }
+  freeze(items) {
+    // turn the automatic first placement into fixed spots, so resizing the window doesn't move anything
+    const out = Object.assign({}, items);
+    Object.keys(out).forEach((id) => { const p = out[id]; if (p.auto || p.anchored) { const q = this.pos(id); out[id] = { x: q.x, y: q.y, at: null }; } });
+    return out;
+  }
   measure() {
     const box = document.querySelector('.measure'); if (!box) return;
     box.querySelectorAll('.mpage').forEach((pg) => {
@@ -182,7 +194,7 @@ class Binder extends Component {
     const items = Object.assign({}, this.state.items);
     this.photoIds.forEach((id) => { if (items[id].at === this.photoHome[id].at && !items[id].moved) items[id] = Object.assign({}, this.photoHome[id]); });
     this.measured = true;
-    this.setState({ items });
+    this.setState({ items: this.freeze(items) });
   }
   onHash() { const slug = (location.hash || '').slice(1); if (slug && slug !== this.spreadSlug(this.state.sp)) this.goSlug(slug); }
   onKey(e) {
@@ -259,6 +271,7 @@ class Binder extends Component {
           }
           np = { at: 2 * this.state.sp + (onLeft ? 0 : 1), lx: nx - (onLeft ? 306 : 800), ly: ny - 114 };
         }
+        if (m.thick) { const c = this.clearSpot(id, np.x, np.y, true); np.x = c.x; np.y = c.y; } // never on the binder
         np.moved = true;
         // put down = on top of whatever it landed on (the binder, other things) — except where a rule says otherwise:
         // dropped onto open pages it's filed into the page (above), and nothing goes over the Focusrite
@@ -291,13 +304,49 @@ class Binder extends Component {
     const v = this.view(), m = META.fr, a = m.rot * Math.PI / 180;
     const bw = m.w * Math.abs(Math.cos(a)) + m.h * Math.abs(Math.sin(a)), bh = m.w * Math.abs(Math.sin(a)) + m.h * Math.abs(Math.cos(a));
     const cx = v.x1 - 0.26 * bw, cy = v.y0 + v.nav + 0.16 * bh;
-    return { x: cx - m.w / 2, y: cy - m.h / 2 };
+    return this.clearSpot('fr', cx - m.w / 2, cy - m.h / 2, true);
   }
   pos(id) {
     const p = this.state.items[id];
     if (id === 'fr' && p.anchored) return Object.assign({}, p, this.frPos());
     if (p.auto) return Object.assign({}, p, this.layout()[id]);
     return p;
+  }
+  binderBoxes() { return [[280, 96, 1320, 776], [1278, 126, 1376, 744], [224, 126, 322, 744]]; }
+  hitsBinder(id, x, y) {
+    // exact test of the item's rotated outline against the open binder and its tabs (separating axes)
+    const m = META[id], a = m.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = x + m.w / 2, cy = y + m.h / 2;
+    const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [cx + u * m.w / 2 * c - v * m.h / 2 * s, cy + u * m.w / 2 * s + v * m.h / 2 * c]);
+    return this.binderBoxes().some((b) => {
+      const bp = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+      const axes = [[1, 0], [0, 1], [c, s], [-s, c]];
+      return axes.every(([ax, ay]) => {
+        const pr = (q) => q.map((p) => p[0] * ax + p[1] * ay);
+        const A = pr(pts), B = pr(bp);
+        return Math.max(...A) > Math.min(...B) + 2 && Math.max(...B) > Math.min(...A) + 2;
+      });
+    });
+  }
+  clearSpot(id, x, y, keepVisible) {
+    // nearest position to x,y where the item doesn't touch the binder (and, if asked, stays mostly on screen)
+    const v = this.view(), m = META[id];
+    const ok = (px, py) => {
+      if (this.hitsBinder(id, px, py)) return false;
+      if (!keepVisible) return true;
+      const cx = px + m.w / 2, cy = py + m.h / 2;
+      // some of it must stay in the window (the binder rule wins over showing all of it)
+      return cx > v.x0 - m.w * 0.2 && cx < v.x1 + m.w * 0.1 && cy > v.y0 - m.h * 0.15 && cy < v.y1 + m.h * 0.2;
+    };
+    if (ok(x, y)) return { x, y };
+    for (let r = 8; r < 900; r += 8) {
+      let best = null, bd = 1e18;
+      for (let t = 0; t < 64; t++) {
+        const ang = t / 64 * Math.PI * 2, px = x + Math.cos(ang) * r, py = y + Math.sin(ang) * r;
+        if (ok(px, py)) { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = { x: px, y: py }; } }
+      }
+      if (best) return best;
+    }
+    return { x, y };
   }
   aabb(id, x, y) {
     const m = META[id], a = m.rot * Math.PI / 180;
@@ -602,7 +651,7 @@ class Binder extends Component {
   blocks(list, live, flat) {
     return list.map((b, k) => {
       switch (b.type) {
-        case 'entry': return html`<div class="entry" key=${k}><h2 class="h2">${b.h}</h2>${b.meta ? html`<p class="meta">${b.meta}</p>` : null}${b.body ? html`<p class="body">${b.body}</p>` : null}</div>`;
+        case 'entry': return html`<div class="entry" key=${k}>${b.logo ? html`<div style="float:right;margin:2px 0 6px 14px"><${Logo} name=${b.logo} h=${b.logo === 'babson' ? 16 : 40} /></div>` : null}<h2 class="h2">${b.h}</h2>${b.meta ? html`<p class="meta">${b.meta}</p>` : null}${b.body ? html`<p class="body">${b.body}</p>` : null}</div>`;
         case 'text': return html`<p class="body" key=${k}>${b.body}</p>`;
         case 'photo': return b.src
           ? (flat
@@ -633,7 +682,7 @@ class Binder extends Component {
     return html`<div class="ink" style="display:flex;flex-direction:column;gap:12px">
       <p class="kicker">${p.kicker}</p><h1 class="h1">${p.title}</h1><hr class="rule" />
       ${p.lead ? html`<p class="lead">${p.lead}</p>` : null}
-      ${p.tags ? html`<ul class="tags" aria-label="Skills">${p.tags.map((t) => html`<li key=${t}>${t}</li>`)}</ul>` : null}
+      ${p.logo ? html`<${Logo} name=${p.logo} h=${p.logo === 'rmhc' ? 52 : 46} />` : null}
     </div>`;
   }
   summary(live) {
@@ -848,7 +897,7 @@ class Binder extends Component {
         <button class="nav strong" onClick=${() => this.setState({ pop: 'contact' })}>Contact me</button>
         <button class="nav" onClick=${() => (st.open ? this.closeBook() : this.openBook())}>${st.open ? 'Close book' : 'Open book'}</button>
         <button class="nav" onClick=${() => this.setState({ muted: !st.muted })}>${st.muted ? 'Audio off' : 'Audio on'}</button>
-        <button class="nav" onClick=${() => { clearTimeout(this.t1); if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0; this.setState({ items: this.home(), held: null, pop: null, sp: 0, flip: null }); }}>Reset page</button>
+        <button class="nav" onClick=${() => { clearTimeout(this.t1); if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0; this._lay = null; this.state.items = this.home(); this.setState({ items: this.freeze(this.home()), held: null, pop: null, sp: 0, flip: null }); }}>Reset page</button>
       </div>
     </div>`;
   }

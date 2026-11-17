@@ -11,9 +11,11 @@ const ARROW_R = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none"
 const ARROW_L = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17" cy="17" r="14"></circle><path d="M24 17H10M16 11l-6 6 6 6"></path></svg>`;
 const META = {
   a: { w: 190, h: 190, rot: -7, z: 14 }, b: { w: 170, h: 170, rot: 6, z: 14 }, st: { w: 128, h: 128, rot: -11, z: 4 },
-  c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 }
+  c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 },
+  fr: { w: 378, h: 214, rot: -14, z: 97, thick: true } // Focusrite interface: a real box, ~4.5 cm tall
 };
-const ITEM_ORDER = ['a', 'b', 'st', 'c3', 'c2', 'c1'];
+const ITEM_ORDER = ['fr', 'a', 'b', 'st', 'c3', 'c2', 'c1'];
+const FOCUSRITE = 'assets/photos/focusrite.webp';
 
 // ---------------------------------------------------------------------------
 // Table items (photos, sticker, business cards). `live` = real links; otherwise plain text (inside the binder).
@@ -22,6 +24,7 @@ function Thing({ which, down, live }) {
   const size = { a: [190, 190], b: [170, 170], st: [128, 128] }[which] || [252, 144];
   const back = { st: '#e9e9e5', c2: '#14171a', c3: '#1f4f9e' }[which] || '#f6f6f3';
   const round = which === 'st' ? '50%' : which.charAt(0) === 'c' ? '3px' : '0';
+  if (which === 'fr') return html`<img src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" draggable="false" style="display:block;width:378px;height:214px" />`;
   const box = `position:relative;width:${size[0]}px;height:${size[1]}px;font-family:Georgia,'Times New Roman',serif`;
   const L = (href, text, style) => live ? html`<a href=${href} target="_blank" rel="noopener" style=${style || ''}>${text}</a>` : html`<span style=${style || ''}>${text}</span>`;
   if (down) return html`<div style=${box}><div style=${`position:absolute;inset:0;border-radius:${round};background:${back}`}></div></div>`;
@@ -158,8 +161,9 @@ class Binder extends Component {
 
   // ---------- items ----------
   home() {
-    return { a: { x: 150, y: 132, at: null }, b: { x: 1290, y: 104, at: null }, st: { x: 1310, y: 640, at: null },
-      c1: { x: 150, y: 470, at: null }, c2: { x: 160, y: 600, at: null }, c3: { x: 142, y: 724, at: null } };
+    return { a: { x: 150, y: 132, at: null }, b: { x: 1318, y: 404, at: null }, st: { x: 1310, y: 640, at: null },
+      c1: { x: 150, y: 470, at: null }, c2: { x: 160, y: 600, at: null }, c3: { x: 142, y: 724, at: null },
+      fr: { x: 1231, y: 43, at: null } }; // top-right corner, mostly off the edge of the desk
   }
   onPages(id, p) { const m = META[id], cx = p.x + m.w / 2, cy = p.y + m.h / 2; return cx > 306 && cx < 1294 && cy > 114 && cy < 758; }
   framePos(id) { const p = this.state.items[id]; return { x: (p.at % 2 === 0 ? 306 : 800) + p.lx, y: 114 + p.ly, at: null }; }
@@ -197,7 +201,7 @@ class Binder extends Component {
         this.justDragged = moved;
         setTimeout(() => { this.justDragged = false; }, 80);
         let np = { x: nx, y: ny, at: null };
-        if (this.state.open && !this.state.flip && this.onPages(id, np)) {
+        if (!m.thick && this.state.open && !this.state.flip && this.onPages(id, np)) {
           // dropped on an open page: it becomes part of that page. Anything poking out over a tab label is slid inward.
           const onLeft = nx + m.w / 2 < 800, ra = m.rot * Math.PI / 180;
           const bw = m.w * Math.abs(Math.cos(ra)) + m.h * Math.abs(Math.sin(ra)), bh = m.w * Math.abs(Math.sin(ra)) + m.h * Math.abs(Math.cos(ra));
@@ -214,6 +218,8 @@ class Binder extends Component {
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     };
   }
+  vpx() { const sc = this.scale(); return (this.state.vw / 2 - 800 * sc) / sc; }
+  vpy() { const sc = this.scale(); return (Math.max(520, this.state.vh) / 2 + 28 - 450 * sc) / sc; }
   litCss(x, y) {
     // the lamp's falloff, mapped onto something lying at frame position x,y
     const st = this.state, sc = this.scale(), vw = st.vw, vh = Math.max(520, st.vh);
@@ -226,6 +232,13 @@ class Binder extends Component {
     const behind = !held && this.overBinder(p.x, p.y, m.w, m.h); // slides under the binder
     const h = held ? 60 : m.z, k = h / (900 - h);
     const dx = (p.x + m.w / 2 - 430) * k, dy = (p.y + m.h / 2 - 70) * k;
+    if (m.thick) {
+      const lift = held ? 40 : 0, hh = m.z + lift, kk = hh / (900 - hh);
+      const sx = (p.x + m.w / 2 - 430) * kk, sy = (p.y + m.h / 2 - 70) * kk, ra = -m.rot * Math.PI / 180;
+      const lx = sx * Math.cos(ra) - sy * Math.sin(ra), ly = sx * Math.sin(ra) + sy * Math.cos(ra); // shadow offset in the item's own (rotated) frame
+      return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.03)' : ''};overflow:visible;` +
+        `z-index:${held ? 30 : behind ? -1 : 10};filter:drop-shadow(${lx.toFixed(1)}px ${ly.toFixed(1)}px ${(5 + hh * 0.1).toFixed(1)}px rgba(0,0,0,.5)) drop-shadow(0 1px 2px rgba(0,0,0,.5));`;
+    }
     return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.04)' : ''};` +
       (id === 'st' ? 'border-radius:50%;' : '') + (id.charAt(0) === 'c' ? 'border-radius:3px;' : '') +
       `z-index:${held ? 30 : behind ? -1 : 10};` +
@@ -693,7 +706,7 @@ class Binder extends Component {
 
         ${ITEM_ORDER.map((id) => html`<div key=${id} class="item" style=${this.itemCss(id)} onPointerDown=${this.hand[id]} onClickCapture=${(e) => { if (this.justDragged) { e.preventDefault(); e.stopPropagation(); } }}>
           <${Thing} which=${id} down=${false} live=${true} />
-          <span class="lit" aria-hidden="true" style=${this.litCss(st.items[id].x || 0, st.items[id].y || 0)}></span>
+          <span class="lit" aria-hidden="true" style=${this.litCss(st.items[id].x || 0, st.items[id].y || 0) + (id === 'fr' ? `;-webkit-mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat;mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat` : '')}></span>
         </div>`)}
       </div>
 

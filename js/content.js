@@ -1,7 +1,8 @@
 // Everything the binder says lives in this file. Edit text here; the layout follows.
 //
 // Page fields:  kicker, title, lead (bold one-line takeaway), tags, slug (link name, e.g. #theater), blocks
-// Block types:  entry {h, meta, body}   text {body}        photo {src, alt} or {label}
+// Block types:  entry {h, meta, body}   text {body}        photo {src, alt, [w, h, rot, tap]} — taped in; visitors can peel it off
+//
 //               role {h, meta}          list {h, items}    links {h, items: [[label, url]]}
 //               hi {h, meta, goto}      jump {}            post {}   pocket {}
 
@@ -82,7 +83,9 @@ export const SECTIONS = [
       ] }
   ] },
   { label: 'Community', sub: 'U-Prep 4 Life, Haitian Relief, Ronald McDonald House', pages: [
-    { kicker: 'Section 05', title: 'Community', slug: 'community', blocks: [{ type: 'post' }] },
+    { kicker: 'Section 05', title: 'Community', slug: 'community', blocks: [
+      { type: 'photo', src: 'assets/photos/postcard.jpg', alt: 'Community members gathered outdoors in Haiti', w: 300, h: 196, rot: 2, tap: 'postcard' }
+    ] },
     { kicker: 'Community', title: 'U-Prep 4 Life Pathway', slug: 'u-prep-4-life',
       lead: 'A guaranteed high school to STEM career pathway for students in Allegheny public housing.',
       tags: ['Teaching', 'Curriculum design', 'Partnerships'],

@@ -14,23 +14,35 @@ const META = {
   c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 },
   fr: { w: 378, h: 214, rot: -14, z: 97, thick: true } // Focusrite interface: a real box, ~4.5 cm tall
 };
-const ITEM_ORDER = ['fr', 'a', 'b', 'st', 'c3', 'c2', 'c1'];
+const BASE_ORDER = ['a', 'b', 'st', 'c3', 'c2', 'c1'];
 const FOCUSRITE = 'assets/photos/focusrite.webp';
+
+// Photos are painted as backgrounds rather than image elements, so they can't be dragged off the page,
+// copied or saved from the right-click menu. They still carry a text label for screen readers.
+const noMenu = (e) => e.preventDefault();
+function Pic({ src, alt, fit, cls, style }) {
+  return html`<div role="img" aria-label=${alt || null} class=${'pic' + (cls ? ' ' + cls : '')} onContextMenu=${noMenu} onDragStart=${noMenu}
+    style=${`background-image:url(${src});background-size:${fit || 'cover'};${style || ''}`}></div>`;
+}
 
 // ---------------------------------------------------------------------------
 // Table items (photos, sticker, business cards). `live` = real links; otherwise plain text (inside the binder).
 // ---------------------------------------------------------------------------
 function Thing({ which, down, live }) {
-  const size = { a: [190, 190], b: [170, 170], st: [128, 128] }[which] || [252, 144];
+  const pm = META[which] && META[which].photo ? META[which] : null;
+  const size = pm ? [pm.w, pm.h] : ({ a: [190, 190], b: [170, 170], st: [128, 128] }[which] || [252, 144]);
   const back = { st: '#e9e9e5', c2: '#14171a', c3: '#1f4f9e' }[which] || '#f6f6f3';
   const round = which === 'st' ? '50%' : which.charAt(0) === 'c' ? '3px' : '0';
-  if (which === 'fr') return html`<img src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" draggable="false" style="display:block;width:378px;height:214px" />`;
+  if (which === 'fr') return html`<${Pic} src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" fit="100% 100%" style="width:378px;height:214px;background-color:transparent" />`;
   const box = `position:relative;width:${size[0]}px;height:${size[1]}px;font-family:Georgia,'Times New Roman',serif`;
   const L = (href, text, style) => live ? html`<a href=${href} target="_blank" rel="noopener" style=${style || ''}>${text}</a>` : html`<span style=${style || ''}>${text}</span>`;
+  if (pm && !down) return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:8px;background:#fdfdfb">
+      <${Pic} src=${pm.src} alt=${pm.alt} fit=${pm.fit} style=${'width:100%;height:100%' + (pm.fit === 'contain' ? ';background-color:#fff' : '')} />
+    </div></div>`;
   if (down) return html`<div style=${box}><div style=${`position:absolute;inset:0;border-radius:${round};background:${back}`}></div></div>`;
   if (which === 'a' || which === 'b') {
     return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:10px;background:#fdfdfb">
-      <img src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.jpg'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} draggable="false" style="display:block;width:100%;height:100%;object-fit:cover" />
+      <${Pic} src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.jpg'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} style="width:100%;height:100%" />
     </div></div>`;
   }
   if (which === 'st') {
@@ -95,6 +107,20 @@ class Binder extends Component {
         pages.push(page);
       });
     });
+    // every photo on a page is a taped-in print: an item that starts on its page and can be peeled off
+    this.photoIds = []; this.photoHome = {};
+    pages.forEach((p, i) => {
+      (p.blocks || []).forEach((b, k) => {
+        if (b.type !== 'photo' || !b.src) return;
+        const id = 'p' + i + '_' + k;
+        META[id] = { w: b.w || 386, h: b.h || 200, rot: b.rot != null ? b.rot : (k % 2 ? 1.1 : -0.9) * (i % 2 ? 1 : -1), z: 2,
+          photo: true, src: b.src, alt: b.alt || '', fit: b.contain ? 'contain' : 'cover', tap: b.tap || null };
+        b.slot = id;
+        this.photoIds.push(id);
+        this.photoHome[id] = { at: i, lx: i % 2 ? 58 : 50, ly: 150 };
+      });
+    });
+    this.order = ['fr'].concat(this.photoIds, BASE_ORDER);
     pages.forEach((p, i) => {
       p.num = i + 1;
       p.hasPrev = i % 2 === 0 && i > 0;
@@ -122,6 +148,7 @@ class Binder extends Component {
     const i = this.slugs[(location.hash || '').slice(1)];
     const sp = i == null ? 0 : Math.floor(i / 2);
     this.setState({ sp, mp: i == null ? 0 : i });
+    requestAnimationFrame(() => this.measure());
     // the binder opens as you arrive
     this.t0 = setTimeout(() => { if (!this.touched) { this.thud(); this.setState({ open: true, slow: true }); } }, 350);
   }
@@ -140,6 +167,20 @@ class Binder extends Component {
     const want = slug ? '#' + slug : '';
     if (want && location.hash !== want) { try { history.replaceState(null, '', want); } catch (e) { /* ignore */ } }
     if (this.isMobile()) { const t = document.querySelector('.m-tab.on'); if (t && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+  }
+  measure() {
+    const box = document.querySelector('.measure'); if (!box) return;
+    box.querySelectorAll('.mpage').forEach((pg) => {
+      const pr = pg.getBoundingClientRect(), i = +pg.dataset.page;
+      pg.querySelectorAll('[data-slot]').forEach((sl) => {
+        const r = sl.getBoundingClientRect(), id = sl.dataset.slot;
+        this.photoHome[id] = { at: i, lx: Math.round(r.left - pr.left), ly: Math.round(r.top - pr.top) };
+      });
+    });
+    const items = Object.assign({}, this.state.items);
+    this.photoIds.forEach((id) => { if (items[id].at === this.photoHome[id].at && !items[id].moved) items[id] = Object.assign({}, this.photoHome[id]); });
+    this.measured = true;
+    this.setState({ items });
   }
   onHash() { const slug = (location.hash || '').slice(1); if (slug && slug !== this.spreadSlug(this.state.sp)) this.goSlug(slug); }
   onKey(e) {
@@ -163,7 +204,8 @@ class Binder extends Component {
   home() {
     return { a: { x: 150, y: 132, at: null }, b: { x: 1318, y: 404, at: null }, st: { x: 1310, y: 640, at: null },
       c1: { x: 150, y: 470, at: null }, c2: { x: 160, y: 600, at: null }, c3: { x: 142, y: 724, at: null },
-      fr: { x: 1231, y: 43, at: null } }; // top-right corner, mostly off the edge of the desk
+      fr: { x: 1231, y: 43, at: null }, // top-right corner, mostly off the edge of the desk
+      ...Object.fromEntries(Object.entries(this.photoHome || {}).map(([k, v]) => [k, Object.assign({}, v)])) };
   }
   onPages(id, p) { const m = META[id], cx = p.x + m.w / 2, cy = p.y + m.h / 2; return cx > 306 && cx < 1294 && cy > 114 && cy < 758; }
   framePos(id) { const p = this.state.items[id]; return { x: (p.at % 2 === 0 ? 306 : 800) + p.lx, y: 114 + p.ly, at: null }; }
@@ -212,8 +254,10 @@ class Binder extends Component {
           }
           np = { at: 2 * this.state.sp + (onLeft ? 0 : 1), lx: nx - (onLeft ? 306 : 800), ly: ny - 114 };
         }
+        np.moved = true;
         const items = Object.assign({}, this.state.items); items[id] = np;
         this.setState({ held: null, items });
+        if (!moved && m.tap) this.setState({ pop: m.tap }); // a tap (no drag) on the postcard turns it over
       };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     };
@@ -245,18 +289,20 @@ class Binder extends Component {
       `box-shadow:${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(3 + h * 0.4).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 1px rgba(0,0,0,.35)'};`;
   }
   tapeFor(id, lx, ly) {
-    // clear tape across the corner sitting deepest inside the page
+    // clear tape across corners that sit inside the page: both top corners for a photo, the deepest one otherwise
     const m = META[id], w = m.w, h = m.h, a = m.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
     const ins = id === 'st' ? m.w * 0.5 * (1 - Math.SQRT1_2) : 0;
     const cs = [[ins, ins, -45], [w - ins, ins, 45], [w - ins, h - ins, -45], [ins, h - ins, 45]];
-    let best = null, bd = 6;
-    cs.forEach((k) => {
+    const depth = cs.map((k) => {
       const dx = k[0] - w / 2, dy = k[1] - h / 2;
       const px = lx + w / 2 + dx * c - dy * sn, py = ly + h / 2 + dx * sn + dy * c;
-      const d = Math.min(px, 494 - px, py, 644 - py);
-      if (d > bd) { bd = d; best = k; }
+      return Math.min(px, 494 - px, py, 644 - py);
     });
-    return best ? `left:${(best[0] - 35).toFixed(1)}px;top:${(best[1] - 11).toFixed(1)}px;transform:rotate(${best[2]}deg)` : null;
+    const css = (k) => `left:${(k[0] - 35).toFixed(1)}px;top:${(k[1] - 11).toFixed(1)}px;transform:rotate(${k[2]}deg)`;
+    if (m.photo && depth[0] > 6 && depth[1] > 6) return [css(cs[0]), css(cs[1])];
+    let best = -1, bd = 6;
+    depth.forEach((d, k) => { if (d > bd) { bd = d; best = k; } });
+    return best < 0 ? [] : [css(cs[best])];
   }
   decals(page, mode) {
     // mode: 'page' (on a visible page) | 'strip' (riding the turning sheet) | 'mirror' (seen through from the other side)
@@ -276,11 +322,11 @@ class Binder extends Component {
         x = fx - 280; y = 18 + p.ly;
       }
       if (face) rot = -rot;
-      const tape = face ? null : this.tapeFor(id, p.lx, p.ly);
+      const tapes = face ? [] : this.tapeFor(id, p.lx, p.ly);
       const css = `left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${rot}deg);` +
         (id === 'st' ? 'border-radius:50%;' : id.charAt(0) === 'c' ? 'border-radius:3px;' : '');
       const thin = 'box-shadow:0 0 1px rgba(0,0,0,.35);';
-      const d = { which: id, face, tape, isItem: true, hint: 'Go to ' + this.pageName(page) };
+      const d = { which: id, face, tapes, isItem: true, hint: 'Go to ' + this.pageName(page) };
       if (mode === 'cover') { d.css = css + 'pointer-events:auto;cursor:' + (open ? 'grab' : 'pointer') + ';'; d.shadow = thin; d.grab = open ? this.hand[id] : null; d.go = open ? null : go; }
       else if (mode === 'page') { d.css = css + thin + (open ? '' : 'cursor:pointer;'); d.grab = open ? this.hand[id] : null; d.go = open ? null : go; }
       else { d.css = css + thin; d.go = go; }
@@ -476,13 +522,15 @@ class Binder extends Component {
   // =========================================================================
   // Rendering
   // =========================================================================
-  blocks(list, live) {
+  blocks(list, live, flat) {
     return list.map((b, k) => {
       switch (b.type) {
         case 'entry': return html`<div class="entry" key=${k}><h2 class="h2">${b.h}</h2>${b.meta ? html`<p class="meta">${b.meta}</p>` : null}${b.body ? html`<p class="body">${b.body}</p>` : null}</div>`;
         case 'text': return html`<p class="body" key=${k}>${b.body}</p>`;
         case 'photo': return b.src
-          ? html`<img key=${k} class=${'photo' + (b.contain ? ' contain' : '')} src=${b.src} alt=${b.alt || ''} draggable="false" />`
+          ? (flat
+            ? html`<${Pic} key=${k} cls=${'photo' + (b.contain ? ' contain' : '')} src=${b.src} alt=${b.alt || ''} fit=${b.contain ? 'contain' : 'cover'} />`
+            : html`<div key=${k} data-slot=${b.slot} aria-hidden="true" style=${`width:${META[b.slot].w}px;height:${META[b.slot].h}px;margin:${b.w ? '12px auto 4px' : '6px 0 2px'};flex:none`}></div>`)
           : html`<div key=${k} class="ph photo">${b.label}</div>`;
         case 'role': return html`<div class="entry sm" key=${k}><h2 class="h2">${b.h}</h2><p class="meta">${b.meta}</p></div>`;
         case 'list': return html`<div key=${k}>${b.h ? html`<h2 class="h2" style="margin-bottom:8px">${b.h}</h2>` : null}<ul class="list">${b.items.map((t, j) => html`<li key=${j}>${t}</li>`)}</ul></div>`;
@@ -494,8 +542,8 @@ class Binder extends Component {
           ? html`<button key=${j} class="btn" onClick=${() => this.goSpread(this.starts[j + 1])}>${s.label}</button>`
           : html`<span key=${j} style="min-height:32px;display:inline-flex;align-items:center;color:#006a96;text-decoration:underline">${s.label}</span>`)}</div></div>`;
         case 'post': return live
-          ? html`<button key=${k} class="post" onClick=${() => this.setState({ pop: 'postcard' })} aria-label="Look at the postcard"><img src=${POSTCARD.photo} alt=${POSTCARD.alt} draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" /></button>`
-          : html`<div key=${k} class="post"><img src=${POSTCARD.photo} alt="" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" /></div>`;
+          ? html`<button key=${k} class="post" onClick=${() => this.setState({ pop: 'postcard' })} aria-label="Look at the postcard"><${Pic} src=${POSTCARD.photo} alt=${POSTCARD.alt} style="position:absolute;inset:0" /></button>`
+          : html`<div key=${k} class="post"><${Pic} src=${POSTCARD.photo} style="position:absolute;inset:0" /></div>`;
         case 'pocket': return live
           ? html`<button key=${k} class="pocket" onClick=${() => this.setState({ pop: 'pocket' })} aria-label="Take the card out of the pocket"><span class="pk-card"></span><span class="pk-front"></span></button>`
           : html`<div key=${k} class="pocket"><span class="pk-card"></span><span class="pk-front"></span></div>`;
@@ -530,7 +578,7 @@ class Binder extends Component {
       <p class="meta">“We do our best work while helping others.” — Woodie Flowers</p>
     </div>`;
   }
-  pageBody(p, side, live) {
+  pageBody(p, side, live, flat) {
     // header + blocks + footer for one page; side 'L' or 'R'
     const foot = side === 'R'
       ? html`<div class="ink foot" style="justify-content:flex-end"><span class="pos">${p.pos}</span><span>${p.num}</span>${p.hasNext ? (live ? html`<button class="arw" onClick=${() => this.goSpread(this.state.sp + 1)} aria-label="Next pages">${ARROW_R}</button>` : html`<span class="arw">${ARROW_R}</span>`) : null}</div>`
@@ -539,7 +587,7 @@ class Binder extends Component {
           : p.hasPrev ? (live ? html`<button class="arw" onClick=${() => this.goSpread(this.state.sp - 1)} aria-label="Previous pages">${ARROW_L}</button>` : html`<span class="arw">${ARROW_L}</span>`) : null}<span>${p.num}</span><span class="pos">${p.pos}</span></div>`;
     return html`<div class=${'pg ' + (side === 'R' ? 'pgR' : 'pgL')}>
       ${p.cover ? this.summary(live) : this.head(p)}
-      ${p.blocks ? html`<div class="ink blocks">${this.blocks(p.blocks, live)}</div>` : null}
+      ${p.blocks ? html`<div class="ink blocks">${this.blocks(p.blocks, live, flat)}</div>` : null}
       ${foot}
     </div>`;
   }
@@ -548,7 +596,7 @@ class Binder extends Component {
       onPointerDown=${interactive === true ? d.grab : null} onClick=${interactive ? d.go : null}
       data-hint=${interactive === 'ghost' ? d.hint : null} title=${interactive === 'ghost' ? d.hint : null}>
       <${Thing} which=${d.which} down=${d.face} />
-      ${d.tape ? html`<span class="tape" style=${d.tape}></span>` : null}
+      ${d.tapes.map((t, j) => html`<span key=${j} class="tape" style=${t}></span>`)}
     </div>`;
   }
   stack(list, side) {
@@ -686,7 +734,7 @@ class Binder extends Component {
 
             <div style="position:absolute;inset:0;transform:rotateY(180deg) translateZ(1px);transform-style:preserve-3d;pointer-events:none">
               ${cDecals.map((d) => html`<div key=${d.which} class="d3" style=${d.css} onPointerDown=${d.grab} onClick=${d.go}>
-                <div class="d3f" style=${d.shadow}><${Thing} which=${d.which} down=${false} />${d.tape ? html`<span class="tape" style=${d.tape}></span>` : null}</div>
+                <div class="d3f" style=${d.shadow}><${Thing} which=${d.which} down=${false} />${d.tapes.map((t, j) => html`<span key=${j} class="tape" style=${t}></span>`)}</div>
                 <div class="d3f" style="transform:rotateY(180deg)"><${Thing} which=${d.which} down=${true} /></div>
               </div>`)}
             </div>
@@ -704,11 +752,15 @@ class Binder extends Component {
             </div>` : null}
         </div>
 
-        ${ITEM_ORDER.map((id) => html`<div key=${id} class="item" style=${this.itemCss(id)} onPointerDown=${this.hand[id]} onClickCapture=${(e) => { if (this.justDragged) { e.preventDefault(); e.stopPropagation(); } }}>
+        ${this.order.map((id) => html`<div key=${id} class="item" style=${this.itemCss(id)} onPointerDown=${this.hand[id]} onClickCapture=${(e) => { if (this.justDragged) { e.preventDefault(); e.stopPropagation(); } }}>
           <${Thing} which=${id} down=${false} live=${true} />
           <span class="lit" aria-hidden="true" style=${this.litCss(st.items[id].x || 0, st.items[id].y || 0) + (id === 'fr' ? `;-webkit-mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat;mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat` : '')}></span>
         </div>`)}
       </div>
+
+      ${this.measured ? null : html`<div class="measure" aria-hidden="true" style="position:absolute;left:-12000px;top:0;visibility:hidden;pointer-events:none">
+        ${this.pages.map((p, i) => p.blocks && p.blocks.some((b) => b.slot) ? html`<div key=${i} class="paper mpage" data-page=${i} style="position:relative;width:494px;height:644px">${this.pageBody(p, i % 2 ? 'R' : 'L', false)}</div>` : null)}
+      </div>`}
 
       ${this.renderNav(cur, false)}
 
@@ -741,7 +793,7 @@ class Binder extends Component {
     let body = null;
     if (st.pop === 'playbill') body = html`<div class="card-pop" style="width:340px;height:500px;display:flex;flex-direction:column">
       <p style="margin:0;height:64px;background:#14171a;color:#fff;font-size:18px;letter-spacing:.4em;line-height:64px;text-align:center">PROGRAM</p>
-      <img src=${PROGRAM.photo} alt=${PROGRAM.alt} style="margin:26px 26px 0;height:200px;object-fit:cover" />
+      <${Pic} src=${PROGRAM.photo} alt=${PROGRAM.alt} style="margin:26px 26px 0;height:200px" />
       <div style="padding:22px 26px;display:flex;flex-direction:column;gap:8px">
         <p style="margin:0;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#005a80;font-weight:700">${PROGRAM.where}</p>
         <p style="margin:0;font-size:28px;line-height:1.15">${PROGRAM.show}</p>
@@ -795,7 +847,7 @@ class Binder extends Component {
         <section>${this.summary(true)}</section>
         ${this.pages.filter((p) => !p.cover).map((p, k) => html`<section key=${k}>
           ${this.head(p)}
-          ${p.blocks ? html`<div class="blocks">${this.blocks(p.blocks.filter((b) => b.type !== 'pocket' && b.type !== 'jump'), true)}</div>` : null}
+          ${p.blocks ? html`<div class="blocks">${this.blocks(p.blocks.filter((b) => b.type !== 'pocket' && b.type !== 'jump'), true, true)}</div>` : null}
         </section>`)}
       </div>
     </div>`;
@@ -828,7 +880,7 @@ class Binder extends Component {
       </div>
       <div class="m-stage" onPointerDown=${swipe}>
         <div key=${st.mp} class="paper m-page m-in" style=${`left:${left.toFixed(1)}px;--ms:${ms.toFixed(4)};--dx:${st.mdir * 40}px`}>
-          ${this.pageBody(Object.assign({}, p, { hasNext: false, hasPrev: false, cover: p.cover }), 'R', true)}
+          ${this.pageBody(Object.assign({}, p, { hasNext: false, hasPrev: false, cover: p.cover }), 'R', true, true)}
         </div>
       </div>
       ${foot}

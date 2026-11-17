@@ -6,13 +6,15 @@ import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js';
 //   binder open:  x 280..1320, y 96..776   (left page 306..800, right page 800..1294, pages y 114..758)
 //   lamp:         (430, 70), 700-900 units above the table
 // ---------------------------------------------------------------------------
-const LIGHT = 'radial-gradient(95% 85% at 24% 10%, rgba(255,230,180,.30), rgba(60,30,8,.05) 36%, rgba(14,6,0,.26) 70%, rgba(6,2,0,.40) 100%)';
+const LIGHT_STOPS = 'rgba(255,230,180,.30), rgba(60,30,8,.05) 36%, rgba(14,6,0,.26) 70%, rgba(6,2,0,.40) 100%';
+const LAMP_H = 700; // lamp height above the table, same as for the binder's shadow
+const LIT_PAD = 700; // lighting layers reach this far past the screen so nothing shows an edge
 const ARROW_R = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17" cy="17" r="14"></circle><path d="M10 17h14M18 11l6 6-6 6"></path></svg>`;
 const ARROW_L = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17" cy="17" r="14"></circle><path d="M24 17H10M16 11l-6 6 6 6"></path></svg>`;
 const META = {
   a: { w: 190, h: 190, rot: -7, z: 14 }, b: { w: 170, h: 170, rot: 6, z: 14 }, st: { w: 128, h: 128, rot: -11, z: 4 },
   c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 },
-  fr: { w: 378, h: 214, rot: -14, z: 97, thick: true } // Focusrite interface: a real box, ~4.5 cm tall
+  fr: { w: 378, h: 213, rot: 50, z: 97, thick: true } // Focusrite interface: a real box, 1.8 in (~97 units) tall, front facing the binder
 };
 const BASE_ORDER = ['a', 'b', 'st', 'c3', 'c2', 'c1'];
 const FOCUSRITE = 'assets/photos/focusrite.webp';
@@ -33,7 +35,7 @@ function Thing({ which, down, live }) {
   const size = pm ? [pm.w, pm.h] : ({ a: [190, 190], b: [170, 170], st: [128, 128] }[which] || [252, 144]);
   const back = { st: '#e9e9e5', c2: '#14171a', c3: '#1f4f9e' }[which] || '#f6f6f3';
   const round = which === 'st' ? '50%' : which.charAt(0) === 'c' ? '3px' : '0';
-  if (which === 'fr') return html`<${Pic} src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" fit="100% 100%" style="width:378px;height:214px;background-color:transparent" />`;
+  if (which === 'fr') return html`<${Pic} src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" fit="100% 100%" style="width:378px;height:213px;background-color:transparent" />`;
   const box = `position:relative;width:${size[0]}px;height:${size[1]}px;font-family:Georgia,'Times New Roman',serif`;
   const L = (href, text, style) => live ? html`<a href=${href} target="_blank" rel="noopener" style=${style || ''}>${text}</a>` : html`<span style=${style || ''}>${text}</span>`;
   if (pm && !down) return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:8px;background:#fdfdfb">
@@ -204,7 +206,7 @@ class Binder extends Component {
   home() {
     return { a: { x: 150, y: 132, at: null }, b: { x: 1318, y: 404, at: null }, st: { x: 1310, y: 640, at: null },
       c1: { x: 150, y: 470, at: null }, c2: { x: 160, y: 600, at: null }, c3: { x: 142, y: 724, at: null },
-      fr: { x: 1231, y: 43, at: null }, // top-right corner, mostly off the edge of the desk
+      fr: { x: 0, y: 0, at: null, anchored: true }, // pinned to the window's top-right corner until someone moves it
       ...Object.fromEntries(Object.entries(this.photoHome || {}).map(([k, v]) => [k, Object.assign({}, v)])) };
   }
   onPages(id, p) { const m = META[id], cx = p.x + m.w / 2, cy = p.y + m.h / 2; return cx > 306 && cx < 1294 && cy > 114 && cy < 758; }
@@ -225,13 +227,15 @@ class Binder extends Component {
       if (e.stopPropagation) e.stopPropagation();
       const lifted = Object.assign({}, this.state.items);
       if (lifted[id].at != null) lifted[id] = this.framePos(id);
+      else if (lifted[id].anchored) lifted[id] = { x: this.pos(id).x, y: this.pos(id).y, at: null };
       const m = META[id], p0 = lifted[id], x0 = e.clientX, y0 = e.clientY, sc = this.scale() || 1;
       let queued = 0, nx = p0.x, ny = p0.y, moved = false;
       this.setState({ held: id, items: lifted });
       const move = (ev) => {
         const dx = (ev.clientX - x0) / sc, dy = (ev.clientY - y0) / sc;
         if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
-        nx = Math.max(-40, Math.min(1640 - m.w, p0.x + dx)); ny = Math.max(40, Math.min(900 - m.h, p0.y + dy));
+        const v = this.view(); // anywhere on the page, even past the table frame on tall or wide windows; up to half off an edge
+        nx = Math.max(v.x0 - m.w / 2, Math.min(v.x1 - m.w / 2, p0.x + dx)); ny = Math.max(v.y0 + v.nav - m.h / 2, Math.min(v.y1 - m.h / 2, p0.y + dy));
         if (!queued) queued = requestAnimationFrame(() => {
           queued = 0;
           const items = Object.assign({}, this.state.items); items[id] = { x: nx, y: ny, at: null };
@@ -262,31 +266,52 @@ class Binder extends Component {
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     };
   }
+  view() {
+    // the visible window, in table coordinates
+    const sc = this.scale(), vw = this.state.vw, vh = Math.max(520, this.state.vh);
+    const fl = vw / 2 - 800 * sc, ft = vh / 2 + 28 - 450 * sc;
+    return { x0: -fl / sc, y0: -ft / sc, x1: (vw - fl) / sc, y1: (vh - ft) / sc, nav: 56 / sc };
+  }
   vpx() { const sc = this.scale(); return (this.state.vw / 2 - 800 * sc) / sc; }
   vpy() { const sc = this.scale(); return (Math.max(520, this.state.vh) / 2 + 28 - 450 * sc) / sc; }
   litCss(x, y) {
-    // the lamp's falloff, mapped onto something lying at frame position x,y
-    const st = this.state, sc = this.scale(), vw = st.vw, vh = Math.max(520, st.vh);
-    const fl = vw / 2 - 800 * sc, ft = vh / 2 + 28 - 450 * sc;
-    return `left:${(-fl / sc - x).toFixed(1)}px;top:${(-ft / sc - y).toFixed(1)}px;width:${(vw / sc).toFixed(1)}px;height:${(vh / sc).toFixed(1)}px;background:${LIGHT}`;
+    // the lamp's falloff mapped onto something lying at table position x,y; reaches well past the screen edges
+    const v = this.view(), W = v.x1 - v.x0, H = v.y1 - v.y0, M = LIT_PAD;
+    return `left:${(v.x0 - x - M).toFixed(1)}px;top:${(v.y0 - y - M).toFixed(1)}px;width:${(W + 2 * M).toFixed(1)}px;height:${(H + 2 * M).toFixed(1)}px;` +
+      `background:radial-gradient(${(0.95 * W).toFixed(1)}px ${(0.85 * H).toFixed(1)}px at ${(0.24 * W + M).toFixed(1)}px ${(0.10 * H + M).toFixed(1)}px, ${LIGHT_STOPS})`;
   }
+  frPos() {
+    // the Focusrite lives in the top-right corner of the window, partly tucked under the menu bar
+    const v = this.view(), m = META.fr, a = m.rot * Math.PI / 180;
+    const bw = m.w * Math.abs(Math.cos(a)) + m.h * Math.abs(Math.sin(a)), bh = m.w * Math.abs(Math.sin(a)) + m.h * Math.abs(Math.cos(a));
+    const cx = v.x1 - 0.26 * bw, cy = v.y0 + v.nav + 0.16 * bh;
+    return { x: cx - m.w / 2, y: cy - m.h / 2 };
+  }
+  pos(id) { const p = this.state.items[id]; return id === 'fr' && p.anchored ? Object.assign({}, p, this.frPos()) : p; }
   itemCss(id) {
-    const m = META[id], p = this.state.items[id], held = this.state.held === id;
+    const m = META[id], p = this.pos(id), held = this.state.held === id;
     if (p.at != null && !held) return 'display:none;';
-    const behind = !held && this.overBinder(p.x, p.y, m.w, m.h); // slides under the binder
+    const behind = !held && this.overBinder(p.x, p.y, m.w, m.h); // slides under the binder (the Focusrite never does: see above)
     const h = held ? 60 : m.z, k = h / (900 - h);
     const dx = (p.x + m.w / 2 - 430) * k, dy = (p.y + m.h / 2 - 70) * k;
     if (m.thick) {
-      const lift = held ? 40 : 0, hh = m.z + lift, kk = hh / (900 - hh);
-      const sx = (p.x + m.w / 2 - 430) * kk, sy = (p.y + m.h / 2 - 70) * kk, ra = -m.rot * Math.PI / 180;
-      const lx = sx * Math.cos(ra) - sy * Math.sin(ra), ly = sx * Math.sin(ra) + sy * Math.cos(ra); // shadow offset in the item's own (rotated) frame
+      // a tall object: always on top of the table, the binder and everything lying on them
       return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.03)' : ''};overflow:visible;` +
-        `z-index:${held ? 30 : behind ? -1 : 10};filter:drop-shadow(${lx.toFixed(1)}px ${ly.toFixed(1)}px ${(5 + hh * 0.1).toFixed(1)}px rgba(0,0,0,.5)) drop-shadow(0 1px 2px rgba(0,0,0,.5));`;
+        `z-index:${held ? 32 : 28};filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));`;
     }
     return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.04)' : ''};` +
       (id === 'st' ? 'border-radius:50%;' : '') + (id.charAt(0) === 'c' ? 'border-radius:3px;' : '') +
       `z-index:${held ? 30 : behind ? -1 : 10};` +
       `box-shadow:${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(3 + h * 0.4).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 1px rgba(0,0,0,.35)'};`;
+  }
+  thickShadow(id) {
+    const m = META[id], p = this.pos(id), held = this.state.held === id;
+    const hh = m.z + (held ? 40 : 0), k = hh / (LAMP_H - hh);
+    const sx = (p.x + m.w / 2 - 430) * k, sy = (p.y + m.h / 2 - 70) * k, ra = -m.rot * Math.PI / 180;
+    const lx = sx * Math.cos(ra) - sy * Math.sin(ra), ly = sx * Math.sin(ra) + sy * Math.cos(ra);
+    const steps = [];
+    for (let t = 0; t <= 8; t++) steps.push(`transform:translate(${(lx * t / 8).toFixed(1)}px,${(ly * t / 8).toFixed(1)}px)`);
+    return { box: `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg);z-index:${held ? 31 : 27};filter:blur(${(2 + hh * 0.05).toFixed(1)}px);opacity:.42`, steps };
   }
   tapeFor(id, lx, ly) {
     // clear tape across corners that sit inside the page: both top corners for a photo, the deepest one otherwise
@@ -752,9 +777,12 @@ class Binder extends Component {
             </div>` : null}
         </div>
 
+        ${(() => { const sh = this.thickShadow('fr'); return html`<div key="fr-shadow" aria-hidden="true" style=${'position:absolute;pointer-events:none;' + sh.box}>
+          ${sh.steps.map((t, j) => html`<div key=${j} style=${`position:absolute;inset:0;background:url(${FOCUSRITE}) 0 0/100% 100% no-repeat;filter:brightness(0);${t}`}></div>`)}</div>`; })()}
         ${this.order.map((id) => html`<div key=${id} class="item" style=${this.itemCss(id)} onPointerDown=${this.hand[id]} onClickCapture=${(e) => { if (this.justDragged) { e.preventDefault(); e.stopPropagation(); } }}>
           <${Thing} which=${id} down=${false} live=${true} />
-          <span class="lit" aria-hidden="true" style=${this.litCss(st.items[id].x || 0, st.items[id].y || 0) + (id === 'fr' ? `;-webkit-mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat;mask:url(${FOCUSRITE}) ${(st.items.fr.x || 0) + this.vpx()}px ${(st.items.fr.y || 0) + this.vpy()}px/378px 214px no-repeat` : '')}></span>
+          <span class="lit" aria-hidden="true" style=${this.litCss(this.pos(id).x || 0, this.pos(id).y || 0) + (id === 'fr' ? (() => { const v = this.view(), q = this.pos('fr'), mx = q.x - v.x0 + LIT_PAD, my = q.y - v.y0 + LIT_PAD;
+            return `;-webkit-mask:url(${FOCUSRITE}) ${mx.toFixed(1)}px ${my.toFixed(1)}px/378px 213px no-repeat;mask:url(${FOCUSRITE}) ${mx.toFixed(1)}px ${my.toFixed(1)}px/378px 213px no-repeat`; })() : '')}></span>
         </div>`)}
       </div>
 

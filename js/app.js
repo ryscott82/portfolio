@@ -1,5 +1,5 @@
 import { html, render, Component } from './vendor/preact-htm.js';
-import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js';
+import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js?v=7';
 
 // ---------------------------------------------------------------------------
 // Scene geometry (all in the 1600 x 900 "table" frame)
@@ -44,12 +44,10 @@ function Thing({ which, down, live }) {
   if (which === 'fr') return html`<${Pic} src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" fit="100% 100%" style="width:378px;height:213px;background-color:transparent" />`;
   const box = `position:relative;width:${size[0]}px;height:${size[1]}px;font-family:Georgia,'Times New Roman',serif`;
   const L = (href, text, style) => live ? html`<a href=${href} target="_blank" rel="noopener" style=${style || ''}>${text}</a>` : html`<span style=${style || ''}>${text}</span>`;
-  if (pm && !down) return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:8px;background:#fdfdfb">
-      <${Pic} src=${pm.src} alt=${pm.alt} fit=${pm.fit} style=${'width:100%;height:100%' + (pm.fit === 'contain' ? ';background-color:#fff' : '')} />
-    </div></div>`;
+  if (pm && !down) return html`<div style=${box}><${Pic} src=${pm.src} alt=${pm.alt} fit=${pm.fit} style=${'position:absolute;inset:0' + (pm.fit === 'contain' ? ';background-color:#fff' : '')} /></div>`;
   if (down) return html`<div style=${box}><div style=${`position:absolute;inset:0;border-radius:${round};background:${back}`}></div></div>`;
   if (which === 'a' || which === 'b') {
-    return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:10px;background:#fdfdfb">
+    return html`<div style=${box}><div style="position:absolute;inset:0">
       <${Pic} src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.jpg'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} style="width:100%;height:100%" />
     </div></div>`;
   }
@@ -139,9 +137,53 @@ class Binder extends Component {
       }
     });
     this.pages = pages;
+    // search index: every page's words, with where they came from
+    const words = (b) => [b.h, b.meta, b.body, b.alt, b.label].concat((b.items || []).map((x) => Array.isArray(x) ? x[0] : x)).filter(Boolean).join(' ');
+    this.index = pages.map((p, i) => ({ i, title: p.cover ? 'About Ryan' : (p.title || p.hintTitle || SECTIONS[p.section].label), section: SECTIONS[p.section].label,
+      text: [p.kicker, p.title, p.lead].concat((p.blocks || []).map(words)).concat(p.cover ? ['Babson College Strategy Consulting résumé LinkedIn contact'] : []).filter(Boolean).join(' ') }));
     this.starts = starts;
     this.spreads = pages.length / 2;
     this.slugs = slugs;
+  }
+  search(q) {
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean); if (!terms.length) return [];
+    const res = [];
+    this.index.forEach((e) => {
+      const t = e.text.toLowerCase(), ti = e.title.toLowerCase();
+      if (!terms.every((w) => t.includes(w) || ti.includes(w))) return;
+      const pos = t.indexOf(terms[0]);
+      const snip = pos < 0 ? e.text.slice(0, 80) : (pos > 30 ? '…' : '') + e.text.slice(Math.max(0, pos - 30), pos + 70) + '…';
+      res.push({ i: e.i, title: e.title, section: e.section, snip, score: (terms.some((w) => ti.includes(w)) ? 0 : 1) * 1000 + e.i });
+    });
+    return res.sort((a, b) => a.score - b.score).slice(0, 6);
+  }
+  goPage(i) { this.setState({ q: '', qSel: 0 }); if (this.isMobile()) this.goMobile(i); else this.goSpread(Math.floor(i / 2)); }
+  renderSearch(mobile) {
+    const st = this.state, q = st.q || '', res = q ? this.search(q) : [], sel = Math.min(st.qSel || 0, Math.max(0, res.length - 1));
+    let pos = '';
+    if (!mobile) {
+      const sc = this.scale(), v = this.view(), ft = -v.y0 * sc, fl = -v.x0 * sc;
+      const top = Math.max(62, ft + 96 * sc - 46), cx = fl + 800 * sc;
+      pos = `position:absolute;top:${top.toFixed(0)}px;left:${(cx - 200).toFixed(0)}px;width:400px;z-index:25`;
+    }
+    const key = (e) => {
+      if (e.key === 'Escape') { this.setState({ q: '' }); e.target.blur(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ qSel: Math.min(sel + 1, res.length - 1) }); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ qSel: Math.max(sel - 1, 0) }); }
+      else if (e.key === 'Enter' && res[sel]) { e.target.blur(); this.goPage(res[sel].i); }
+    };
+    return html`<div class=${'search' + (mobile ? ' m' : '')} style=${pos} role="search">
+      <label class="search-field">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5" fill="none" stroke="#6b6f75" stroke-width="1.8"></circle><path d="M10.4 10.4 15 15" stroke="#6b6f75" stroke-width="2" stroke-linecap="round"></path></svg>
+        <input type="search" value=${q} placeholder="Search the portfolio — try “robotics” or “Javert”" aria-label="Search the portfolio"
+          onInput=${(e) => this.setState({ q: e.target.value, qSel: 0 })} onKeyDown=${key} />
+      </label>
+      ${q ? html`<div class="search-res" role="listbox">
+        ${res.length ? res.map((r, k) => html`<button key=${r.i} role="option" aria-selected=${k === sel} class=${'search-hit' + (k === sel ? ' on' : '')} onMouseDown=${(e) => { e.preventDefault(); this.goPage(r.i); }}>
+          <span class="search-t">${r.title}<span class="search-s"> · ${r.section}, p. ${r.i + 1}</span></span><span class="search-x">${r.snip}</span></button>`)
+          : html`<div class="search-none">Nothing found for “${q}”</div>`}
+      </div>` : null}
+    </div>`;
   }
   pageName(i) { const p = this.pages[i]; return p.cover ? 'the first page' : (p.title || p.hintTitle || SECTIONS[p.section].label); }
   spreadSlug(sp) { const L = this.pages[2 * sp], R = this.pages[2 * sp + 1]; return (L && L.slug) || (R && R.slug) || ''; }
@@ -168,7 +210,8 @@ class Binder extends Component {
     if (this.raf) cancelAnimationFrame(this.raf);
     if (this.unbind) this.unbind();
   }
-  componentDidUpdate() {
+  componentDidUpdate(pp, ps) {
+    if (ps && ps.open !== this.state.open && this.measured) setTimeout(() => this.rescue(), 60);
     // keep the address bar on the current spread, so any page can be linked to
     const st = this.state;
     const slug = this.isMobile() ? (this.pages[st.mp].slug || '') : (st.open && !st.flip ? this.spreadSlug(st.sp) : '');
@@ -179,7 +222,7 @@ class Binder extends Component {
   freeze(items) {
     // turn the automatic first placement into fixed spots, so resizing the window doesn't move anything
     const out = Object.assign({}, items);
-    Object.keys(out).forEach((id) => { const p = out[id]; if (p.auto || p.anchored) { const q = this.pos(id); out[id] = { x: q.x, y: q.y, at: null }; } });
+    Object.keys(out).forEach((id) => { const p = out[id]; if (p.auto || p.anchored) { const q = this.pos(id); out[id] = { x: q.x, y: q.y, at: null, hidden: !!q.hidden }; } });
     return out;
   }
   measure() {
@@ -195,6 +238,15 @@ class Binder extends Component {
     this.photoIds.forEach((id) => { if (items[id].at === this.photoHome[id].at && !items[id].moved) items[id] = Object.assign({}, this.photoHome[id]); });
     this.measured = true;
     this.setState({ items: this.freeze(items) });
+  }
+  rescue() {
+    const items = Object.assign({}, this.state.items); let changed = false;
+    this.order.forEach((id) => {
+      const p = items[id]; if (p.at != null || p.hidden || p.onTop || p.auto || p.anchored || id === 'fr') return;
+      const m = META[id];
+      if (this.overBinder(p.x, p.y, m.w, m.h)) { const c = this.clearSpot(id, p.x, p.y, true); items[id] = Object.assign({}, p, { x: c.x, y: c.y }); changed = true; }
+    });
+    if (changed) this.setState({ items });
   }
   onHash() { const slug = (location.hash || '').slice(1); if (slug && slug !== this.spreadSlug(this.state.sp)) this.goSlug(slug); }
   onKey(e) {
@@ -355,41 +407,41 @@ class Binder extends Component {
     return [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2];
   }
   layout() {
-    // Uses the whole window: every loose item goes to the free spot (clear of the open binder, its tabs and shadow,
-    // the Focusrite, the menu bar, the bottom buttons and each other) nearest its preferred place.
-    // If the window has no free spot big enough, it falls back to its preferred place, partly under the binder.
+    // Places the loose things on load. Each goes to the free spot nearest where it'd like to be: fully on screen,
+    // clear of the binder (and its tabs and shadow), the Focusrite and the menu bar; it may overlap the pile a little.
+    // Anything that can't find such a spot is left off the table, so small screens stay uncluttered and
+    // nothing is ever hidden under the binder.
     const v = this.view(), key = [this.state.vw, this.state.vh].join('x');
     if (this._lay && this._lay.key === key) return this._lay.pos;
-    const prefer = { c1: [150, 470], c2: [160, 600], c3: [142, 724], a: [150, 132], b: [1318, 404], st: [1310, 640] };
-    const order = ['c1', 'c2', 'c3', 'a', 'b', 'st'];
-    const pad = 12, botBar = 50 / this.scale();
-    const fr = this.frPos(), obstacles = [[214, 84, 1386, 812], this.aabb('fr', fr.x, fr.y)];
-    const lim = [v.x0 + 10, v.y0 + v.nav + 10, v.x1 - 10, v.y1 - botBar - 6];
-    const hit = (b, o) => b[0] < o[2] + pad && b[2] > o[0] - pad && b[1] < o[3] + pad && b[3] > o[1] - pad;
+    const prefer = { c1: [150, 470], a: [150, 132], c2: [160, 600], b: [1318, 404], c3: [142, 724], st: [1310, 640] };
+    const order = ['c1', 'a', 'c2', 'b', 'c3', 'st'];
+    const botBar = 50 / this.scale();
+    const fr = this.frPos(), hard = [[214, 84, 1386, 812], this.aabb('fr', fr.x, fr.y)], placed = [];
+    const lim = [v.x0 + 8, v.y0 + v.nav + 8, v.x1 - 8, v.y1 - botBar - 6];
+    const inter = (b, o) => Math.max(0, Math.min(b[2], o[2]) - Math.max(b[0], o[0])) * Math.max(0, Math.min(b[3], o[3]) - Math.max(b[1], o[1]));
     const out = {};
     order.forEach((id) => {
-      const m = META[id], [px, py] = prefer[id];
+      const [px, py] = prefer[id], b0 = this.aabb(id, 0, 0), area = (b0[2] - b0[0]) * (b0[3] - b0[1]);
       let best = null, bd = 1e18;
-      for (let y = lim[1]; y < lim[3]; y += 14) {
-        for (let x = lim[0]; x < lim[2]; x += 14) {
-          const ix = x - (this.aabb(id, 0, 0)[0]), iy = y - (this.aabb(id, 0, 0)[1]); // item origin so its box starts at x,y
-          const b = this.aabb(id, ix, iy);
+      for (let y = lim[1]; y < lim[3]; y += 12) {
+        for (let x = lim[0]; x < lim[2]; x += 12) {
+          const ix = x - b0[0], iy = y - b0[1], b = this.aabb(id, ix, iy);
           if (b[2] > lim[2] || b[3] > lim[3]) continue;
-          if (obstacles.some((o) => hit(b, o))) continue;
+          if (hard.some((o) => inter(b, o) > 0)) continue;
+          if (placed.some((o) => inter(b, o) > area * 0.3)) continue; // a loose pile is fine; mostly covered isn't
           const d = (ix - px) * (ix - px) + (iy - py) * (iy - py);
           if (d < bd) { bd = d; best = [ix, iy]; }
         }
       }
-      const p = best || [px, py];
-      out[id] = { x: p[0], y: p[1] };
-      obstacles.push(this.aabb(id, p[0], p[1]));
+      if (best) { out[id] = { x: best[0], y: best[1] }; placed.push(this.aabb(id, best[0], best[1])); }
+      else out[id] = { x: px, y: py, hidden: true };
     });
     this._lay = { key, pos: out };
     return out;
   }
   itemCss(id) {
     const m = META[id], p = this.pos(id), held = this.state.held === id;
-    if (p.at != null && !held) return 'display:none;';
+    if ((p.at != null || p.hidden) && !held) return 'display:none;';
     // under the binder only if the binder came down over it (e.g. the cover opened onto it); if it was put on the binder, it stays on top
     const behind = !held && !p.onTop && this.overBinder(p.x, p.y, m.w, m.h);
     const rank = this.order.filter((k) => { const q = this.state.items[k]; return q.at == null && (q.zi || 0) < (p.zi || 0); }).length;
@@ -832,7 +884,7 @@ class Binder extends Component {
           </div>
 
           <div style=${`position:absolute;left:520px;top:0;width:520px;height:680px;z-index:5;transform-origin:left center;transform-style:preserve-3d;transform:${st.open ? 'rotateY(-180deg)' : 'rotateY(0deg)'};transition:transform ${dur} cubic-bezier(.4,.1,.2,1)`}>
-            <button class="leather cover" onClick=${() => this.openBook()} aria-label="Open Ryan Edward Scott's portfolio" style="position:absolute;inset:0;width:520px;height:680px;border:0;padding:0;margin:0;cursor:pointer;border-radius:6px 16px 16px 6px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -2px 3px rgba(0,0,0,.85),inset -3px 0 4px rgba(0,0,0,.6)">
+            <button class="leather cover" onClick=${() => this.openBook()} aria-label="Open Ryan Edward Scott's portfolio" tabindex=${st.open ? -1 : 0} style=${`visibility:${st.open ? 'hidden' : 'visible'};transition:visibility 0s linear ${st.open ? (st.slow ? '.9s' : '.45s') : '0s'};position:absolute;inset:0;width:520px;height:680px;border:0;padding:0;margin:0;cursor:pointer;border-radius:6px 16px 16px 6px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -2px 3px rgba(0,0,0,.85),inset -3px 0 4px rgba(0,0,0,.6)`}>
               <span aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(150% 110% at -21% -6%, rgba(255,240,215,.34), rgba(255,255,255,.07) 50%, rgba(0,0,0,.5) 100%)"></span>
               <span class="lit" aria-hidden="true" style=${this.litCss(ox + 520, 96)}></span>
               <span aria-hidden="true" style="position:absolute;left:0;top:0;width:26px;height:100%;background:linear-gradient(90deg, rgba(0,0,0,.6), rgba(255,255,255,.06) 60%, rgba(0,0,0,.28))"></span>
@@ -845,7 +897,7 @@ class Binder extends Component {
               </span>
             </button>
 
-            <div class="lining" style="position:absolute;inset:0;transform:rotateY(180deg);backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px 6px 6px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -2px 3px rgba(0,0,0,.8)">
+            <div class="lining" style=${`visibility:${st.open ? 'visible' : 'hidden'};transition:visibility 0s linear ${st.open ? (st.slow ? '.9s' : '.45s') : '.45s'};`+'position:absolute;inset:0;transform:rotateY(180deg);backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px 6px 6px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -2px 3px rgba(0,0,0,.8)'}>
               <div aria-hidden="true" style="position:absolute;inset:0;overflow:hidden;border-radius:16px 6px 6px 16px;pointer-events:none"><span style=${'position:absolute;' + this.litCss(ox, 96)}></span></div>
               <div aria-hidden="true" style="position:absolute;inset:9px;border:1.5px dashed rgba(150,148,140,.5);border-radius:10px 3px 3px 10px"></div>
               <div class="gl">${this.stack(lS, 'L')}</div>
@@ -892,6 +944,7 @@ class Binder extends Component {
       </div>`}
 
       ${this.renderNav(cur, false)}
+      ${this.renderSearch(false)}
 
       <div class="bottombar">
         <button class="nav strong" onClick=${() => this.setState({ pop: 'contact' })}>Contact me</button>
@@ -1007,6 +1060,7 @@ class Binder extends Component {
           ${SECTIONS.map((s, i) => html`<button key=${i} role="tab" aria-selected=${i === cur} class=${'m-tab' + (i === cur ? ' on' : '')} onClick=${() => this.goMobile(2 * this.starts[i])}>${s.label}</button>`)}
         </div>
       </div>
+      <div style="padding:0 10px 8px;position:relative;z-index:6">${this.renderSearch(true)}</div>
       <div class="m-stage" onPointerDown=${swipe}>
         <div key=${st.mp} class="paper m-page m-in" style=${`left:${left.toFixed(1)}px;--ms:${ms.toFixed(4)};--dx:${st.mdir * 40}px`}>
           ${this.pageBody(Object.assign({}, p, { hasNext: false, hasPrev: false, cover: p.cover }), 'R', true, true)}

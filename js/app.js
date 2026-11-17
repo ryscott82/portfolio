@@ -204,8 +204,9 @@ class Binder extends Component {
 
   // ---------- items ----------
   home() {
-    return { a: { x: 150, y: 132, at: null }, b: { x: 1318, y: 404, at: null }, st: { x: 1310, y: 640, at: null },
-      c1: { x: 150, y: 470, at: null }, c2: { x: 160, y: 600, at: null }, c3: { x: 142, y: 724, at: null },
+    // loose things start 'auto': placed into whatever open table there is around the binder (see layout())
+    return { a: { auto: true, at: null }, b: { auto: true, at: null }, st: { auto: true, at: null },
+      c1: { auto: true, at: null }, c2: { auto: true, at: null }, c3: { auto: true, at: null },
       fr: { x: 0, y: 0, at: null, anchored: true }, // pinned to the window's top-right corner until someone moves it
       ...Object.fromEntries(Object.entries(this.photoHome || {}).map(([k, v]) => [k, Object.assign({}, v)])) };
   }
@@ -227,7 +228,7 @@ class Binder extends Component {
       if (e.stopPropagation) e.stopPropagation();
       const lifted = Object.assign({}, this.state.items);
       if (lifted[id].at != null) lifted[id] = this.framePos(id);
-      else if (lifted[id].anchored) lifted[id] = { x: this.pos(id).x, y: this.pos(id).y, at: null };
+      else if (lifted[id].anchored || lifted[id].auto) lifted[id] = { x: this.pos(id).x, y: this.pos(id).y, at: null };
       const m = META[id], p0 = lifted[id], x0 = e.clientX, y0 = e.clientY, sc = this.scale() || 1;
       let queued = 0, nx = p0.x, ny = p0.y, moved = false;
       this.setState({ held: id, items: lifted });
@@ -259,6 +260,11 @@ class Binder extends Component {
           np = { at: 2 * this.state.sp + (onLeft ? 0 : 1), lx: nx - (onLeft ? 306 : 800), ly: ny - 114 };
         }
         np.moved = true;
+        // put down = on top of whatever it landed on (the binder, other things) — except where a rule says otherwise:
+        // dropped onto open pages it's filed into the page (above), and nothing goes over the Focusrite
+        this.zTop = (this.zTop || 0) + 1;
+        np.zi = this.zTop;
+        if (np.at == null) np.onTop = this.overBinder(np.x, np.y, m.w, m.h);
         const items = Object.assign({}, this.state.items); items[id] = np;
         this.setState({ held: null, items });
         if (!moved && m.tap) this.setState({ pop: m.tap }); // a tap (no drag) on the postcard turns it over
@@ -287,21 +293,67 @@ class Binder extends Component {
     const cx = v.x1 - 0.26 * bw, cy = v.y0 + v.nav + 0.16 * bh;
     return { x: cx - m.w / 2, y: cy - m.h / 2 };
   }
-  pos(id) { const p = this.state.items[id]; return id === 'fr' && p.anchored ? Object.assign({}, p, this.frPos()) : p; }
+  pos(id) {
+    const p = this.state.items[id];
+    if (id === 'fr' && p.anchored) return Object.assign({}, p, this.frPos());
+    if (p.auto) return Object.assign({}, p, this.layout()[id]);
+    return p;
+  }
+  aabb(id, x, y) {
+    const m = META[id], a = m.rot * Math.PI / 180;
+    const bw = m.w * Math.abs(Math.cos(a)) + m.h * Math.abs(Math.sin(a)), bh = m.w * Math.abs(Math.sin(a)) + m.h * Math.abs(Math.cos(a));
+    const cx = x + m.w / 2, cy = y + m.h / 2;
+    return [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2];
+  }
+  layout() {
+    // Uses the whole window: every loose item goes to the free spot (clear of the open binder, its tabs and shadow,
+    // the Focusrite, the menu bar, the bottom buttons and each other) nearest its preferred place.
+    // If the window has no free spot big enough, it falls back to its preferred place, partly under the binder.
+    const v = this.view(), key = [this.state.vw, this.state.vh].join('x');
+    if (this._lay && this._lay.key === key) return this._lay.pos;
+    const prefer = { c1: [150, 470], c2: [160, 600], c3: [142, 724], a: [150, 132], b: [1318, 404], st: [1310, 640] };
+    const order = ['c1', 'c2', 'c3', 'a', 'b', 'st'];
+    const pad = 12, botBar = 50 / this.scale();
+    const fr = this.frPos(), obstacles = [[214, 84, 1386, 812], this.aabb('fr', fr.x, fr.y)];
+    const lim = [v.x0 + 10, v.y0 + v.nav + 10, v.x1 - 10, v.y1 - botBar - 6];
+    const hit = (b, o) => b[0] < o[2] + pad && b[2] > o[0] - pad && b[1] < o[3] + pad && b[3] > o[1] - pad;
+    const out = {};
+    order.forEach((id) => {
+      const m = META[id], [px, py] = prefer[id];
+      let best = null, bd = 1e18;
+      for (let y = lim[1]; y < lim[3]; y += 14) {
+        for (let x = lim[0]; x < lim[2]; x += 14) {
+          const ix = x - (this.aabb(id, 0, 0)[0]), iy = y - (this.aabb(id, 0, 0)[1]); // item origin so its box starts at x,y
+          const b = this.aabb(id, ix, iy);
+          if (b[2] > lim[2] || b[3] > lim[3]) continue;
+          if (obstacles.some((o) => hit(b, o))) continue;
+          const d = (ix - px) * (ix - px) + (iy - py) * (iy - py);
+          if (d < bd) { bd = d; best = [ix, iy]; }
+        }
+      }
+      const p = best || [px, py];
+      out[id] = { x: p[0], y: p[1] };
+      obstacles.push(this.aabb(id, p[0], p[1]));
+    });
+    this._lay = { key, pos: out };
+    return out;
+  }
   itemCss(id) {
     const m = META[id], p = this.pos(id), held = this.state.held === id;
     if (p.at != null && !held) return 'display:none;';
-    const behind = !held && this.overBinder(p.x, p.y, m.w, m.h); // slides under the binder (the Focusrite never does: see above)
+    // under the binder only if the binder came down over it (e.g. the cover opened onto it); if it was put on the binder, it stays on top
+    const behind = !held && !p.onTop && this.overBinder(p.x, p.y, m.w, m.h);
+    const rank = this.order.filter((k) => { const q = this.state.items[k]; return q.at == null && (q.zi || 0) < (p.zi || 0); }).length;
     const h = held ? 60 : m.z, k = h / (900 - h);
     const dx = (p.x + m.w / 2 - 430) * k, dy = (p.y + m.h / 2 - 70) * k;
     if (m.thick) {
       // a tall object: always on top of the table, the binder and everything lying on them
       return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.03)' : ''};overflow:visible;` +
-        `z-index:${held ? 32 : 28};filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));`;
+        `z-index:${held ? 72 : 60};filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));`;
     }
     return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.04)' : ''};` +
       (id === 'st' ? 'border-radius:50%;' : '') + (id.charAt(0) === 'c' ? 'border-radius:3px;' : '') +
-      `z-index:${held ? 30 : behind ? -1 : 10};` +
+      `z-index:${held ? 70 : behind ? -1 : 10 + rank};` +
       `box-shadow:${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(3 + h * 0.4).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 1px rgba(0,0,0,.35)'};`;
   }
   thickShadow(id) {
@@ -311,7 +363,7 @@ class Binder extends Component {
     const lx = sx * Math.cos(ra) - sy * Math.sin(ra), ly = sx * Math.sin(ra) + sy * Math.cos(ra);
     const steps = [];
     for (let t = 0; t <= 8; t++) steps.push(`transform:translate(${(lx * t / 8).toFixed(1)}px,${(ly * t / 8).toFixed(1)}px)`);
-    return { box: `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg);z-index:${held ? 31 : 27};filter:blur(${(2 + hh * 0.05).toFixed(1)}px);opacity:.42`, steps };
+    return { box: `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg);z-index:${held ? 71 : 59};filter:blur(${(2 + hh * 0.05).toFixed(1)}px);opacity:.42`, steps };
   }
   tapeFor(id, lx, ly) {
     // clear tape across corners that sit inside the page: both top corners for a photo, the deepest one otherwise
@@ -334,7 +386,7 @@ class Binder extends Component {
     //       'R'/'L' (deeper in a stack, binder coords) | 'cover' (inside the front cover)
     const out = [], items = this.state.items, open = this.state.open;
     const go = () => { if (!open) this.openBook(Math.floor(page / 2)); else this.goSpread(Math.floor(page / 2)); };
-    Object.keys(items).forEach((id) => {
+    Object.keys(items).sort((x, y) => (items[x].zi || 0) - (items[y].zi || 0)).forEach((id) => {
       const p = items[id]; if (p.at !== page) return;
       const m = META[id], left = page % 2 === 0;
       let rot = m.rot, face = false, x, y;

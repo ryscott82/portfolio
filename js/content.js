@@ -1,7 +1,7 @@
 // Everything the binder says lives in this file. Edit text here; the layout follows.
 //
 // Page fields:  kicker, title, lead (bold one-line takeaway), logo, slug (link name, e.g. #theater), blocks
-// Logos:        babson, wholefoods, ftc, frc, rmhc (files in assets/logos/) — on a page or an entry ({..., logo: 'babson'})
+// Logos:        babson, cmu, vertex, wholefoods, ftc, frc, rmhc, bmc (files in assets/logos/) — on a page or an entry ({..., logo: 'babson'})
 // Block types:  entry {h, meta, body}   text {body}        photo {src, alt, [w, h, rot, tap]} — taped in; visitors can peel it off
 //
 //               role {h, meta}          list {h, items}    links {h, items: [[label, url]]}
@@ -9,7 +9,8 @@
 
 export const CONTACT = {
   name: 'Ryan Edward Scott',
-  email: '', // e.g. 'ryan@example.com' — shown on the contact card and summary page when filled in
+  email: 'ryscott82@gmail.com',
+  phone: '', // left off on purpose: a public site gets scraped. Add it here to show it on the contact card.
   resume: 'resume.pdf', // put your résumé PDF at the root of the repo with this name
   linkedin: 'http://www.linkedin.com/in/ryscott82',
   instagram: 'http://instagram.com/ryscott82',
@@ -21,36 +22,54 @@ const P = (name, alt) => ({ type: 'photo', src: 'assets/photos/' + name + '.jpg'
 const E = (h, meta, body, logo) => ({ type: 'entry', h, meta: meta || '', body: body || '', logo });
 const T = (body) => ({ type: 'text', body });
 const R = (h, meta) => ({ type: 'role', h, meta });
+const L = (h, items) => ({ type: 'list', h, items });
 
 export const SECTIONS = [
   { label: 'About', pages: [
     { cover: true, slug: 'about' },
     { kicker: 'Ryan Edward Scott', title: 'At a glance', slug: 'at-a-glance', blocks: [
+      { type: 'hi', h: '51 software risks found for Vertex Pharmaceuticals', meta: 'Student consultant, Babson MCFE, 2026', goto: 'vertex' },
+      { type: 'hi', h: '$80,000+ budget, 40+ people, 600+ attendees', meta: 'President, Babson Players', goto: 'arts' },
       { type: 'hi', h: 'First Place CONNECT Award', meta: 'FIRST Tech Challenge World Championship, 2021–2022', goto: 'ftc' },
-      { type: 'hi', h: '$7,000 raised, 252 patients treated', meta: 'Haitian Relief traveling medical clinic', goto: 'haitian-relief' },
-      { type: 'hi', h: '8-module computer science curriculum', meta: 'U-Prep 4 Life Pathway, Allegheny public housing', goto: 'u-prep-4-life' },
       { type: 'jump' }
     ] }
   ] },
-  { label: 'Experience', sub: 'Weissman Foundry, MySTEM Academy, Whole Foods', pages: [
+  { label: 'Experience', sub: 'Weissman Foundry, Carnegie Mellon, Vertex, and more', pages: [
     { kicker: 'Section 02', title: 'Experience', slug: 'experience', blocks: [
       P('exp', 'The Weissman Foundry at Babson College'),
       { type: 'links', h: 'Résumé', items: [['Download my résumé (PDF)', CONTACT.resume]] }
     ] },
     { blocks: [
-      E('Weissman Foundry', 'Babson College', 'Teaching students the product development cycle and advanced manufacturing techniques.', 'babson'),
-      E('MySTEM Academy', '', 'Leading 3rd–7th graders through the journey of Scratch and Python programming.'),
-      E('Whole Foods Market', 'E-Commerce Team Member', '', 'wholefoods')
+      E('Weissman Foundry', 'Product Development Consultant (Scout) · Jan 2025–present', 'Consult 40+ students in physical and digital product development and advanced manufacturing.', 'babson'),
+      E('Carnegie Mellon University', 'Lab Intern · Jun–Sep 2026', 'Researched and planned effective ways to bring AI into primary education.', 'cmu'),
+      E('STEM Coding Lab', 'Project Analyst · Jun–Aug 2026', 'Collected and analyzed 8,000+ data points in a custom Google Sheets database. Created 9 lessons teaching elementary students the limits of AI.')
+    ] },
+    { kicker: 'Experience · Babson College MCFE', title: 'Vertex Pharmaceuticals', slug: 'vertex', logo: 'vertex',
+      lead: 'Student consultant: identified 51 risks in new software systems, with recommendations to mitigate each.',
+      blocks: [
+        L('Jan–May 2026', [
+          'Applied insights from 4 interviews with industry professionals and consultants, and 2 key case studies',
+          'Presented 15 detailed technical slides and a living risk register that calculates ongoing RPNs'
+        ])
+      ] },
+    { blocks: [
+      E('Whole Foods Market', 'E-Commerce Team Member (seasonal) · Nov 2024–Aug 2025', 'Fulfilled online orders at 70+ units per hour with 100% accuracy.', 'wholefoods'),
+      E('MySTEM Academy', 'Coding and Robotics Summer Camp Instructor · Jun–Aug 2022', 'Led 3rd–7th graders through Scratch and Python programming.'),
+      E('Amazon FBA / Print on Demand', 'Self-employed · Jun 2020–May 2022', '')
     ] }
   ] },
   { label: 'Education', sub: 'Babson College, Pine-Richland / Sewickley', pages: [
     { kicker: 'Section 03', title: 'Education', slug: 'education', blocks: [P('edu', 'Babson College campus from above')] },
     { blocks: [
-      E('Babson College', 'Bachelor of Science in Business Administration', 'Concentrating in Strategy and Consulting.', 'babson'),
-      E('High School', 'Pine-Richland / Sewickley Academy · Class of 2024', '')
+      E('Babson College', 'B.S. Business Administration, Strategy & Consulting · 2024–2027', '3.4 GPA, Dean’s List. Coursework: Management Consulting Field Experience, Negotiations, FME, Technology Operations Management.', 'babson'),
+      E('Pine-Richland & Sewickley Academy', 'High school · Class of 2024', 'Highest Honor Roll; 9 AP and 13 advanced or honors courses.'),
+      R('Business software', 'Microsoft Office, Google Workspace, Apple iWork, Minitab'),
+      R('AI', 'OpenAI API, Gemini, Claude (Anthropic API), Copilot, Llama, Perplexity'),
+      R('Creative & technical', 'Adobe Creative Cloud, Fusion 360, Revit, Final Cut, Logic, Canva'),
+      R('Languages', 'Java, Python, R, HTML; basic Swift, SQL, Zsh and Go')
     ] }
   ] },
-  { label: 'Projects', sub: 'Mela-Know-More, FTC and FRC robotics', pages: [
+  { label: 'Projects', sub: 'MindHugz, Mela-Know-More, BrainSTEM robotics', pages: [
     { kicker: 'Section 04', title: 'Projects', slug: 'projects', blocks: [
       P('projects', 'Close-up of the team 8393 robot'),
       { type: 'links', h: 'Videos', items: [
@@ -60,9 +79,23 @@ export const SECTIONS = [
         ['First Place Compass Award (FTC)', 'https://youtu.be/O6-WrQWFEGk']
       ] }
     ] },
+    { kicker: 'Projects · Babson College FME', title: 'MindHugz', slug: 'mindhugz',
+      lead: 'Chief Operations Officer: built the supply chain and took the product to market in 4 months.',
+      blocks: [
+        E('Aug 2024–Apr 2025', '', 'Developed the supply chain pipeline and evaluated 6 suppliers against 7 KPIs.')
+      ] },
     { kicker: 'Projects', title: 'Mela-Know-More', slug: 'mela-know-more',
       lead: 'Melanoma risk analysis software that won the CONNECT Award at the FIRST World Championship.',
       blocks: [P('mela', 'Mela-Know-More project poster: mission, technology and feedback from experts')] },
+    { kicker: 'Projects · BrainSTEM Learning Inc.', title: 'BrainSTEM Robotics', slug: 'brainstem',
+      lead: 'Business and Community Outreach Lead, 2018–2024.',
+      blocks: [
+        L('', [
+          'Led teams of 20+ people in large-scale projects, outreach events and fundraising',
+          'Wrote 500+ pages of technical documentation, financials and project summaries',
+          'Designed and manufactured hall-of-fame recognized robots'
+        ])
+      ] },
     { kicker: 'Projects · FTC Teams 8393 and 6931', title: 'FIRST Tech Challenge', slug: 'ftc', logo: 'ftc',
       lead: 'Six seasons of competitive robotics, with a First Place CONNECT Award at Worlds.',
       blocks: [
@@ -80,35 +113,37 @@ export const SECTIONS = [
         E('2024', 'Pittsburgh and Miami Valley Regionals, World Championship', 'Engineering Inspiration Award; IMPACT Award; callback judging for Engineering Inspiration at Worlds (top 4 teams).')
       ] }
   ] },
-  { label: 'Community', sub: 'U-Prep 4 Life, Haitian Relief, Ronald McDonald House', pages: [
+  { label: 'Community', sub: 'U-Prep 4 Life, Haitian Relief, Belize, Ronald McDonald House', pages: [
     { kicker: 'Section 05', title: 'Community', slug: 'community', blocks: [
       { type: 'photo', src: 'assets/photos/postcard.jpg', alt: 'Community members gathered outdoors in Haiti', w: 300, h: 196, rot: 2, tap: 'postcard' }
     ] },
     { kicker: 'Community', title: 'U-Prep 4 Life Pathway', slug: 'u-prep-4-life',
-      lead: 'A guaranteed high school to STEM career pathway for students in Allegheny public housing.',
+      lead: 'A computer science curriculum for publicly housed students, built with 2 universities as part of a $150,000 grant.',
       blocks: [
-        { type: 'list', h: 'What I did', items: [
+        L('What I did', [
           'Created an 8-module supplemental high school computer science curriculum, with slideshows and class activities',
           'Represented my team in meetings with M-Powerhouse, Slippery Rock University, Pittsburgh Technical College and Dark Rhino Security',
           'Worked with M-Powerhouse to write grants for program sustainability',
           'Co-taught several modules; designed posters, an EPK and marketing materials'
-        ] }
+        ])
       ] },
     { kicker: 'Community', title: 'Haitian Relief', slug: 'haitian-relief',
-      lead: 'Raised over $7,000 for a traveling clinic that has treated 252 patients in 3 villages.',
+      lead: 'Raised over $7,000 for medical clinics and farming classes in Haiti.',
       blocks: [
         T('My friends and I wanted to help people in Haiti, living in a gang-run environment. I first wanted to start STEM classes, but experts told us food, water and health were more pressing: there is no running water or electricity, and infrastructure could not be imported.'),
-        T('So we held a community bingo night to fund the clinic, and sent 10 local farmers for training on improving harvest yield and quality.')
+        T('So we held community events to fund a traveling medical clinic, which has treated 252 patients in 3 villages, and sent 10 local farmers for training on improving harvest yield and quality.')
       ] },
-    { kicker: 'Community', title: 'Ronald McDonald House', slug: 'ronald-mcdonald-house', logo: 'rmhc',
-      lead: 'Built 20 STEM activity stations for the families of hospitalized children.',
+    { kicker: 'Community', title: 'Belize and Ronald McDonald House', slug: 'belize',
       blocks: [
-        T('Extended hospitalization affects entire families, so I led a program with the Ronald McDonald House: electronics learning labs, LEGO, snap circuits and marble races for young family members of every age.'),
-        T('The local director told us, “No one ever thinks about the families.”')
+        E('Robotics in Belize City', '', 'Presented to the Bayer Project panel and was awarded $15,000 to start 20 robotics teams in Belize City.'),
+        E('Ronald McDonald House', '', 'Led a program of 20 STEM activity stations for the families of hospitalized children: electronics learning labs, LEGO, snap circuits and marble races. The local director told us, “No one ever thinks about the families.”', 'rmhc')
       ] }
   ] },
-  { label: 'The Arts', sub: 'Theater, training, photography, music', pages: [
-    { kicker: 'Section 06', title: 'The Arts', slug: 'arts', blocks: [P('arts', 'Ryan singing on stage'), T('Babson Players · President')] },
+  { label: 'The Arts', sub: 'Babson Players, theater, training, photography, music', pages: [
+    { kicker: 'Section 06', title: 'The Arts', slug: 'arts', blocks: [
+      P('arts', 'Ryan singing on stage'),
+      E('Babson Players', 'President', 'Manage an $80,000+ annual budget, lead teams of 40+ people and host events with 600+ attendees.')
+    ] },
     { kicker: 'The Arts', title: 'Theater', slug: 'theater',
       lead: '13 roles across school, community and regional stages.',
       blocks: [
@@ -140,8 +175,8 @@ export const SECTIONS = [
       T('[A FEW WORDS ABOUT WHAT YOU SHOOT]')
     ] },
     { kicker: 'The Arts', title: 'Music', slug: 'music', blocks: [
-      E('Debut album coming soon', '', ''),
-      E('Babson Music Collective', '2025', 'Vocals and keys for an 8-piece band.'),
+      E('Babson Music Collective', 'Student Leader', 'Vocals and keys for an 8-piece band. Debut album coming soon.', 'bmc'),
+      E('Babson Sound', 'Vice-President', 'Leading campus musicians through live music events, solving technical and logistical challenges.'),
       { type: 'pocket' }
     ] }
   ] }

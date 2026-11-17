@@ -1,5 +1,5 @@
 import { html, render, Component } from './vendor/preact-htm.js';
-import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js?v=7';
+import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js?v=9';
 
 // ---------------------------------------------------------------------------
 // Scene geometry (all in the 1600 x 900 "table" frame)
@@ -12,14 +12,15 @@ const LIT_PAD = 700; // lighting layers reach this far past the screen so nothin
 const ARROW_R = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17" cy="17" r="14"></circle><path d="M10 17h14M18 11l6 6-6 6"></path></svg>`;
 const ARROW_L = html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17" cy="17" r="14"></circle><path d="M24 17H10M16 11l-6 6 6 6"></path></svg>`;
 const META = {
-  a: { w: 190, h: 190, rot: -7, z: 14 }, b: { w: 170, h: 170, rot: 6, z: 14 }, st: { w: 128, h: 128, rot: -11, z: 4 },
+  a: { w: 190, h: 190, rot: -7, z: 14 }, b: { w: 170, h: 170, rot: 6, z: 14 }, st: { w: 160, h: 170, rot: -11, z: 4, shaped: true },
   c1: { w: 252, h: 144, rot: -4, z: 9 }, c2: { w: 252, h: 144, rot: 5, z: 7 }, c3: { w: 252, h: 144, rot: -2, z: 5 },
   fr: { w: 378, h: 213, rot: 20, z: 97, thick: true } // Focusrite interface: a real box, 1.8 in (~97 units) tall, front facing the binder
 };
 const BASE_ORDER = ['a', 'b', 'st', 'c3', 'c2', 'c1'];
 const FOCUSRITE = 'assets/photos/focusrite.webp';
-const LOGOS = { babson: [600, 75], wholefoods: [240, 240], ftc: [305, 240], frc: [350, 240], rmhc: [158, 240] };
-const LOGO_NAMES = { babson: 'Babson College', wholefoods: 'Whole Foods Market', ftc: 'FIRST Tech Challenge', frc: 'FIRST Robotics Competition', rmhc: 'Ronald McDonald House' };
+const LOGOS = { babson: [600, 75], cmu: [600, 54], vertex: [455, 240], wholefoods: [240, 240], ftc: [305, 240], frc: [350, 240], rmhc: [158, 240], bmc: [300, 261] };
+const ENTRY_LOGO_H = { babson: 16, cmu: 14 }; // wordmarks sit small; square logos at 40
+const LOGO_NAMES = { babson: 'Babson College', cmu: 'Carnegie Mellon University', vertex: 'Vertex Pharmaceuticals', wholefoods: 'Whole Foods Market', ftc: 'FIRST Tech Challenge', frc: 'FIRST Robotics Competition', rmhc: 'Ronald McDonald House', bmc: 'Babson Music Collective' };
 function Logo({ name, h }) {
   const d = LOGOS[name]; if (!d) return null;
   return html`<${Pic} src=${'assets/logos/' + name + '.png'} alt=${LOGO_NAMES[name] + ' logo'} fit="contain" cls="logo" style=${`width:${Math.round(d[0] * h / d[1])}px;height:${h}px;background-color:transparent;flex:none`} />`;
@@ -33,26 +34,32 @@ function Pic({ src, alt, fit, cls, style }) {
     style=${`background-image:url(${src});background-size:${fit || 'cover'};${style || ''}`}></div>`;
 }
 
+// The sticker: Ryan's own die-cut 'HOMETOWN HERO 412' jersey sticker
+const STICKER = 'assets/photos/sticker412.webp';
+const STICKER_MASK = `url(${STICKER})`;
+function Sticker({ down }) {
+  if (down) return html`<div aria-hidden="true" style=${`width:160px;height:170px;background:#efefeb;-webkit-mask:${STICKER_MASK} 0 0/100% 100% no-repeat;mask:${STICKER_MASK} 0 0/100% 100% no-repeat`}></div>`;
+  return html`<${Pic} src=${STICKER} alt="Sticker: the back of a white jersey reading Hometown Hero 412" fit="100% 100%" style="width:160px;height:170px;background-color:transparent" />`;
+}
+
 // ---------------------------------------------------------------------------
 // Table items (photos, sticker, business cards). `live` = real links; otherwise plain text (inside the binder).
 // ---------------------------------------------------------------------------
 function Thing({ which, down, live }) {
   const pm = META[which] && META[which].photo ? META[which] : null;
-  const size = pm ? [pm.w, pm.h] : ({ a: [190, 190], b: [170, 170], st: [128, 128] }[which] || [252, 144]);
+  const size = pm ? [pm.w, pm.h] : ({ a: [190, 190], b: [170, 170], st: [160, 170] }[which] || [252, 144]);
   const back = { st: '#e9e9e5', c2: '#14171a', c3: '#1f4f9e' }[which] || '#f6f6f3';
   const round = which === 'st' ? '50%' : which.charAt(0) === 'c' ? '3px' : '0';
   if (which === 'fr') return html`<${Pic} src=${FOCUSRITE} alt="Focusrite Scarlett audio interface" fit="100% 100%" style="width:378px;height:213px;background-color:transparent" />`;
   const box = `position:relative;width:${size[0]}px;height:${size[1]}px;font-family:Georgia,'Times New Roman',serif`;
   const L = (href, text, style) => live ? html`<a href=${href} target="_blank" rel="noopener" style=${style || ''}>${text}</a>` : html`<span style=${style || ''}>${text}</span>`;
   if (pm && !down) return html`<div style=${box}><${Pic} src=${pm.src} alt=${pm.alt} fit=${pm.fit} style=${'position:absolute;inset:0' + (pm.fit === 'contain' ? ';background-color:#fff' : '')} /></div>`;
+  if (which === 'st') return html`<div style=${box}><${Sticker} down=${!!down} /></div>`;
   if (down) return html`<div style=${box}><div style=${`position:absolute;inset:0;border-radius:${round};background:${back}`}></div></div>`;
   if (which === 'a' || which === 'b') {
     return html`<div style=${box}><div style="position:absolute;inset:0">
       <${Pic} src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.jpg'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} style="width:100%;height:100%" />
     </div></div>`;
-  }
-  if (which === 'st') {
-    return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;border-radius:50%;background:#f4f4f2;border:5px solid #ffffff;display:flex;align-items:center;justify-content:center;font-size:13.5px;color:#333">[STICKER]</div></div>`;
   }
   if (which === 'c1') {
     return html`<div style=${box}><div style="position:absolute;inset:0;box-sizing:border-box;padding:18px 20px;border-radius:3px;background:#fdfdfb;color:#17181a;display:flex;flex-direction:column">
@@ -63,7 +70,7 @@ function Thing({ which, down, live }) {
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:#006a96">
         ${L('https://ryanedwardscott.com', 'ryanedwardscott.com')}
         ${L(CONTACT.linkedin, 'linkedin.com/in/ryscott82')}
-        <span style="color:#44474b">${CONTACT.email || '[EMAIL]'} · [PHONE]</span>
+        <span style="color:#44474b">${[CONTACT.email, CONTACT.phone].filter(Boolean).join(' · ')}</span>
       </div></div></div>`;
   }
   if (which === 'c2') {
@@ -163,7 +170,9 @@ class Binder extends Component {
     let pos = '';
     if (!mobile) {
       const sc = this.scale(), v = this.view(), ft = -v.y0 * sc, fl = -v.x0 * sc;
-      const top = Math.max(62, ft + 96 * sc - 46), cx = fl + 800 * sc;
+      // sit in the gap between the menu bar and the binder: up to 40px clear of the binder when there's room
+      const binderTop = ft + 96 * sc, gap = binderTop - 56 - 36;
+      const top = Math.max(62, binderTop - 36 - Math.min(40, Math.max(8, gap / 2))), cx = fl + 800 * sc;
       pos = `position:absolute;top:${top.toFixed(0)}px;left:${(cx - 200).toFixed(0)}px;width:400px;z-index:25`;
     }
     const key = (e) => {
@@ -175,7 +184,7 @@ class Binder extends Component {
     return html`<div class=${'search' + (mobile ? ' m' : '')} style=${pos} role="search">
       <label class="search-field">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5" fill="none" stroke="#6b6f75" stroke-width="1.8"></circle><path d="M10.4 10.4 15 15" stroke="#6b6f75" stroke-width="2" stroke-linecap="round"></path></svg>
-        <input type="search" value=${q} placeholder="Search the portfolio — try “robotics” or “Javert”" aria-label="Search the portfolio"
+        <input type="search" value=${q} placeholder="Search the portfolio" aria-label="Search the portfolio"
           onInput=${(e) => this.setState({ q: e.target.value, qSel: 0 })} onKeyDown=${key} />
       </label>
       ${q ? html`<div class="search-res" role="listbox">
@@ -453,9 +462,11 @@ class Binder extends Component {
         `z-index:${held ? 72 : 60};filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));`;
     }
     return `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${m.rot}deg)${held ? ' scale(1.04)' : ''};` +
-      (id === 'st' ? 'border-radius:50%;' : '') + (id.charAt(0) === 'c' ? 'border-radius:3px;' : '') +
+      (id.charAt(0) === 'c' ? 'border-radius:3px;' : '') +
       `z-index:${held ? 70 : behind ? -1 : 10 + rank};` +
-      `box-shadow:${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(3 + h * 0.4).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 1px rgba(0,0,0,.35)'};`;
+      (m.shaped
+        ? `overflow:visible;filter:drop-shadow(${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(2 + h * 0.2).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 .8px rgba(0,0,0,.45)'});`
+        : `box-shadow:${held ? `${dx.toFixed(1)}px ${dy.toFixed(1)}px ${(3 + h * 0.4).toFixed(1)}px rgba(0,0,0,.42)` : '0 0 1px rgba(0,0,0,.35)'};`);
   }
   thickShadow(id) {
     const m = META[id], p = this.pos(id), held = this.state.held === id;
@@ -469,8 +480,7 @@ class Binder extends Component {
   tapeFor(id, lx, ly) {
     // clear tape across corners that sit inside the page: both top corners for a photo, the deepest one otherwise
     const m = META[id], w = m.w, h = m.h, a = m.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
-    const ins = id === 'st' ? m.w * 0.5 * (1 - Math.SQRT1_2) : 0;
-    const cs = [[ins, ins, -45], [w - ins, ins, 45], [w - ins, h - ins, -45], [ins, h - ins, 45]];
+    const cs = id === 'st' ? [[w * 0.24, h * 0.07, -35], [w * 0.76, h * 0.07, 35], [w * 0.8, h * 0.93, -25], [w * 0.2, h * 0.93, 25]] : [[0, 0, -45], [w, 0, 45], [w, h, -45], [0, h, 45]];
     const depth = cs.map((k) => {
       const dx = k[0] - w / 2, dy = k[1] - h / 2;
       const px = lx + w / 2 + dx * c - dy * sn, py = ly + h / 2 + dx * sn + dy * c;
@@ -502,8 +512,8 @@ class Binder extends Component {
       if (face) rot = -rot;
       const tapes = face ? [] : this.tapeFor(id, p.lx, p.ly);
       const css = `left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${m.w}px;height:${m.h}px;transform:rotate(${rot}deg);` +
-        (id === 'st' ? 'border-radius:50%;' : id.charAt(0) === 'c' ? 'border-radius:3px;' : '');
-      const thin = 'box-shadow:0 0 1px rgba(0,0,0,.35);';
+        (id.charAt(0) === 'c' ? 'border-radius:3px;' : '');
+      const thin = m.shaped ? 'filter:drop-shadow(0 0 .8px rgba(0,0,0,.45));' : 'box-shadow:0 0 1px rgba(0,0,0,.35);';
       const d = { which: id, face, tapes, isItem: true, hint: 'Go to ' + this.pageName(page) };
       if (mode === 'cover') { d.css = css + 'pointer-events:auto;cursor:' + (open ? 'grab' : 'pointer') + ';'; d.shadow = thin; d.grab = open ? this.hand[id] : null; d.go = open ? null : go; }
       else if (mode === 'page') { d.css = css + thin + (open ? '' : 'cursor:pointer;'); d.grab = open ? this.hand[id] : null; d.go = open ? null : go; }
@@ -551,8 +561,9 @@ class Binder extends Component {
     // t: 0 = sheet flat where it started, 1 = flat on the other side. The free edge leads a little, the spine follows.
     const N = this.N, w = 494 / N, PI = Math.PI;
     const cl = (v) => v < 0 ? 0 : v > 1 ? 1 : v, ez = (v) => v * v * (3 - 2 * v);
-    const te = PI * ez(cl(t * 1.2)), ts = PI * ez(cl((t - 0.17) / 0.83));
-    const ang = (u) => { const th = ts + (te - ts) * Math.pow(u, 1.3); return dir === 'B' ? PI - th : th; };
+    const f = this.state.flip, n = f ? Math.abs(f.b - f.a) : 1, bend = Math.max(0.3, 1 / (1 + 0.3 * (n - 1)));
+    const lag = 0.17 * bend, te = PI * ez(cl(t * (1 + 0.2 * bend))), ts = PI * ez(cl((t - lag) / (1 - lag)));
+    const ang = (u) => { const th = ts + (te - ts) * Math.pow(u, 1 + 0.3 * bend); return dir === 'B' ? PI - th : th; };
     const out = []; let x = 0, z = 0, zmax = 0, smin = 1e9, smax = -1e9;
     for (let i = 0; i < N; i++) {
       const th = ang((i + 0.5) / N);
@@ -601,10 +612,17 @@ class Binder extends Component {
   finish(commit) {
     this.raf = 0;
     const f = this.state.flip; if (!f) return;
-    this.setState(commit ? { sp: f.b, flip: null } : { flip: null });
+    this.setState(commit ? { sp: f.b, flip: null } : { flip: null }, () => { if (commit && this.chainTo != null) this.stepChain(); });
   }
-  animate(dir, v0, v1, commit) {
-    let t0 = 0; const dur = Math.max(180, 950 * Math.abs(v1 - v0));
+  stepChain() {
+    const st = this.state, t = this.chainTo;
+    if (t == null || !st.open || st.sp === t) { this.chainTo = null; return; }
+    const next = st.sp + (t > st.sp ? 1 : -1);
+    const dir = this.beginFlip(next, () => this.animate(dir, 0, 1, true, this.chainDur));
+    if (dir) this.noise(0.28, 'lowpass', 560, 260, 0.012, 0.08);
+  }
+  animate(dir, v0, v1, commit, fixed) {
+    let t0 = 0; const dur = fixed || Math.max(180, 950 * Math.abs(v1 - v0));
     const frame = (now) => {
       if (!t0) t0 = now;
       const k = Math.min(1, (now - t0) / dur);
@@ -619,14 +637,18 @@ class Binder extends Component {
     if (this.isMobile()) { this.goMobile(2 * t); return; }
     if (t < 0 || t >= this.spreads) return;
     if (!st.open) { this.openBook(t); return; }
+    const n = Math.abs(t - st.sp);
+    this.chainTo = null;
+    // any distance is one turn: the sheets in between go over together as a block
     const dir = this.beginFlip(t, () => {
       if (this.stillMotion()) { this.t1 = setTimeout(() => this.finish(true), 60); return; }
-      this.animate(dir, 0, 1, true);
+      this.animate(dir, 0, 1, true, n > 1 ? Math.min(1250, 1000 + 30 * n) : 0);
     });
-    if (dir) this.swoosh();
+    if (dir) { if (n > 1) this.noise(0.6, 'lowpass', 480, 200, 0.026, 0.3); else this.swoosh(); }
   }
   openBook(t) { this.touched = true; clearTimeout(this.t0); this.thud(); this.setState({ open: true, slow: false, sp: t == null ? this.state.sp : t, flip: null }); }
   closeBook() {
+    this.chainTo = null;
     clearTimeout(this.t1); if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0;
     if (this.state.open) this.thud();
     this.touched = true;
@@ -703,7 +725,7 @@ class Binder extends Component {
   blocks(list, live, flat) {
     return list.map((b, k) => {
       switch (b.type) {
-        case 'entry': return html`<div class="entry" key=${k}>${b.logo ? html`<div style="float:right;margin:2px 0 6px 14px"><${Logo} name=${b.logo} h=${b.logo === 'babson' ? 16 : 40} /></div>` : null}<h2 class="h2">${b.h}</h2>${b.meta ? html`<p class="meta">${b.meta}</p>` : null}${b.body ? html`<p class="body">${b.body}</p>` : null}</div>`;
+        case 'entry': return html`<div class="entry" key=${k}>${b.logo ? html`<div style="float:right;margin:2px 0 6px 14px"><${Logo} name=${b.logo} h=${ENTRY_LOGO_H[b.logo] || 40} /></div>` : null}<h2 class="h2">${b.h}</h2>${b.meta ? html`<p class="meta">${b.meta}</p>` : null}${b.body ? html`<p class="body">${b.body}</p>` : null}</div>`;
         case 'text': return html`<p class="body" key=${k}>${b.body}</p>`;
         case 'photo': return b.src
           ? (flat
@@ -803,16 +825,17 @@ class Binder extends Component {
     else if (f) { li = 2 * f.b; ri = 2 * f.a + 1; sf = 2 * f.b + 1; sb = 2 * f.a; }
     else { li = 2 * st.sp; ri = 2 * st.sp + 1; }
     const N = this.N, w = 494 / N, strips = [];
+    const T = f ? Math.min(14, 1.5 * (Math.abs(f.b - f.a) - 1)) : 0;
     if (f) {
       const G = this.geom(f.dir, 0), fD = this.decals(sf, 'strip'), bD = this.decals(sb, 'strip'), fX = this.decals(sb, 'mirror'), bX = this.decals(sf, 'mirror');
       for (let i = 0; i < N; i++) {
         const xf = i * w, xb = 494 - (i + 1) * w, W = Math.min(w + 1.4, 494 - xf);
         strips.push({ i, init: this.stripCss(G.strips[i]) + `;width:${W.toFixed(2)}px`,
           bgF: `background-position:${(-xf).toFixed(2)}px 0;clip-path:inset(-400px ${i === N - 1 ? '-400px' : '0'} -400px 0)`,
-          bgB: `transform:rotateY(180deg);background-position:${(-xb).toFixed(2)}px 0;clip-path:inset(-400px 0 -400px ${i === N - 1 ? '-400px' : '0'})`,
+          bgB: `transform:translateZ(${(-T).toFixed(1)}px) rotateY(180deg);background-position:${(-xb).toFixed(2)}px 0;clip-path:inset(-400px 0 -400px ${i === N - 1 ? '-400px' : '0'})`,
           offF: `left:${(-xf).toFixed(2)}px;width:494px`, offB: `left:${(-xb).toFixed(2)}px;width:494px`,
           fD, bD, fX, bX, ovF: this.ovClip(W, i === N - 1, false), ovB: this.ovClip(W, i === N - 1, true),
-          tabs: i === N - 1 ? moving : [] });
+          tabs: i === N - 1 ? moving : [], W });
       }
     }
     // page edges: left = sheets already turned, right = sheets still to come
@@ -925,6 +948,9 @@ class Binder extends Component {
                 <div class="paper face" style=${s.bgB}><div class="off" style=${s.offB}><div class="gutL"></div>${this.pageBody(SB, 'L', false)}${s.bD.map((d) => this.decal(d, false))}</div><div class="shd shB"></div></div>
                 ${s.fX.length ? html`<div class="ovh" style=${s.ovF}><div class="off" style=${s.offF}>${s.fX.map((d) => this.decal(d, false))}</div></div>` : null}
                 ${s.bX.length ? html`<div class="ovh" style=${s.ovB}><div class="off" style=${s.offB}>${s.bX.map((d) => this.decal(d, false))}</div></div>` : null}
+                ${T ? html`<div class="blk" style=${`left:0;top:0;width:${s.W.toFixed(2)}px;height:${T}px;transform:rotateX(-90deg)`}></div>
+                  <div class="blk" style=${`left:0;top:644px;width:${s.W.toFixed(2)}px;height:${T}px;transform:rotateX(-90deg)`}></div>
+                  ${s.i === N - 1 ? html`<div class="blk blkV" style=${`left:${s.W.toFixed(2)}px;top:0;width:${T}px;height:644px;transform:rotateY(90deg)`}></div>` : null}` : null}
                 ${s.tabs.map((t) => html`<div key=${t.label} class="stab" style=${t.style}>${this.tabFace(t, false)}${this.tabFace(t, true)}</div>`)}
               </div>`)}
             </div>` : null}
@@ -934,7 +960,8 @@ class Binder extends Component {
           ${sh.steps.map((t, j) => html`<div key=${j} style=${`position:absolute;inset:0;background:url(${FOCUSRITE}) 0 0/100% 100% no-repeat;filter:brightness(0);${t}`}></div>`)}</div>`; })()}
         ${this.order.map((id) => html`<div key=${id} class="item" style=${this.itemCss(id)} onPointerDown=${this.hand[id]} onClickCapture=${(e) => { if (this.justDragged) { e.preventDefault(); e.stopPropagation(); } }}>
           <${Thing} which=${id} down=${false} live=${true} />
-          <span class="lit" aria-hidden="true" style=${this.litCss(this.pos(id).x || 0, this.pos(id).y || 0) + (id === 'fr' ? (() => { const v = this.view(), q = this.pos('fr'), mx = q.x - v.x0 + LIT_PAD, my = q.y - v.y0 + LIT_PAD;
+          <span class="lit" aria-hidden="true" style=${this.litCss(this.pos(id).x || 0, this.pos(id).y || 0) + (id === 'st' ? (() => { const v = this.view(), q = this.pos('st'), mx = q.x - v.x0 + LIT_PAD, my = q.y - v.y0 + LIT_PAD;
+            return `;-webkit-mask:${STICKER_MASK} ${mx.toFixed(1)}px ${my.toFixed(1)}px/160px 170px no-repeat;mask:${STICKER_MASK} ${mx.toFixed(1)}px ${my.toFixed(1)}px/160px 170px no-repeat`; })() : '') + (id === 'fr' ? (() => { const v = this.view(), q = this.pos('fr'), mx = q.x - v.x0 + LIT_PAD, my = q.y - v.y0 + LIT_PAD;
             return `;-webkit-mask:url(${FOCUSRITE}) ${mx.toFixed(1)}px ${my.toFixed(1)}px/378px 213px no-repeat;mask:url(${FOCUSRITE}) ${mx.toFixed(1)}px ${my.toFixed(1)}px/378px 213px no-repeat`; })() : '')}></span>
         </div>`)}
       </div>
@@ -948,6 +975,8 @@ class Binder extends Component {
 
       <div class="bottombar">
         <button class="nav strong" onClick=${() => this.setState({ pop: 'contact' })}>Contact me</button>
+        <a class="nav strong" href=${CONTACT.resume} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">Résumé (PDF)</a>
+        <button class="nav" onClick=${() => this.setState({ plain: true })}>Plain view</button>
         <button class="nav" onClick=${() => (st.open ? this.closeBook() : this.openBook())}>${st.open ? 'Close book' : 'Open book'}</button>
         <button class="nav" onClick=${() => this.setState({ muted: !st.muted })}>${st.muted ? 'Audio off' : 'Audio on'}</button>
         <button class="nav" onClick=${() => { clearTimeout(this.t1); if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0; this._lay = null; this.state.items = this.home(); this.setState({ items: this.freeze(this.home()), held: null, pop: null, sp: 0, flip: null }); }}>Reset page</button>
@@ -962,9 +991,7 @@ class Binder extends Component {
       <div class="navr">
         ${SECTIONS.map((sec, i) => { const on = st.open && i === cur; return html`<button key=${i} class="nav" onClick=${() => this.goSpread(this.starts[i])} aria-current=${on ? 'page' : null} style=${`color:${on ? '#5cc8f5' : '#e6dfcf'};border-bottom-color:${on ? '#009ddc' : 'transparent'}`}>${sec.label}</button>`; })}
         <span class="navsep" aria-hidden="true"></span>
-        <a class="nav navcta" href=${CONTACT.resume} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">Résumé (PDF)</a>
         <button class="nav navcta" onClick=${() => this.setState({ pop: 'contact' })}>Contact</button>
-        <button class="nav" onClick=${() => this.setState({ plain: true })} style="color:#e6dfcf">Plain view</button>
       </div>
     </nav>`;
   }
@@ -1043,7 +1070,8 @@ class Binder extends Component {
     const swipe = (e) => this.swipeStart(e, (d) => this.goMobile(st.mp + d));
     const foot = html`<div class="m-bottom">
       <button class="nav" disabled=${st.mp === 0} onClick=${() => this.goMobile(st.mp - 1)}>‹ Back</button>
-      <button class="nav" style="font-weight:700;color:#fff" onClick=${() => this.setState({ pop: 'contact' })}>Contact me</button>
+      <a class="nav" href=${CONTACT.resume} target="_blank" rel="noopener" style="font-weight:700;color:#fff;display:inline-flex;align-items:center;text-decoration:none">Résumé</a>
+      <button class="nav" onClick=${() => this.setState({ plain: true })}>Plain view</button>
       <button class="nav" disabled=${st.mp === this.pages.length - 1} onClick=${() => this.goMobile(st.mp + 1)}>Next ›</button>
     </div>`;
     return html`<div class="oak m-root">
@@ -1051,10 +1079,7 @@ class Binder extends Component {
       <div class="m-top">
         <div class="m-row">
           <button class="nav" onClick=${() => this.goMobile(0)} style="color:#efe9da;font-size:16px;padding-left:4px">Ryan Edward Scott</button>
-          <div style="display:flex">
-            <a class="nav navcta" href=${CONTACT.resume} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;font-size:14px">Résumé</a>
-            <button class="nav" onClick=${() => this.setState({ plain: true })} style="color:#e6dfcf;font-size:14px">Plain view</button>
-          </div>
+          <button class="nav navcta" onClick=${() => this.setState({ pop: 'contact' })} style="font-size:14px">Contact</button>
         </div>
         <div class="m-tabs" role="tablist">
           ${SECTIONS.map((s, i) => html`<button key=${i} role="tab" aria-selected=${i === cur} class=${'m-tab' + (i === cur ? ' on' : '')} onClick=${() => this.goMobile(2 * this.starts[i])}>${s.label}</button>`)}

@@ -18,7 +18,7 @@ export const CONTACT = {
   remg: 'https://ryanedwardmediagroup.com'
 };
 
-const P = (name, alt) => ({ type: 'photo', src: 'assets/photos/' + name + '.jpg', alt, contain: name === 'mela' });
+const P = (name, alt) => ({ type: 'photo', src: 'assets/photos/' + name + '.webp', alt, contain: name === 'mela' });
 const E = (h, meta, body, logo) => ({ type: 'entry', h, meta: meta || '', body: body || '', logo });
 const T = (body) => ({ type: 'text', body });
 const R = (h, meta) => ({ type: 'role', h, meta });
@@ -115,7 +115,7 @@ export const SECTIONS = [
   ] },
   { label: 'Community', sub: 'U-Prep 4 Life, Haitian Relief, Belize, Ronald McDonald House', pages: [
     { kicker: 'Section 05', title: 'Community', slug: 'community', blocks: [
-      { type: 'photo', src: 'assets/photos/postcard.jpg', alt: 'Community members gathered outdoors in Haiti', w: 300, h: 196, rot: 2, tap: 'postcard' }
+      { type: 'photo', src: 'assets/photos/postcard.webp', alt: 'Community members gathered outdoors in Haiti', w: 300, h: 196, rot: 2, tap: 'postcard' }
     ] },
     { kicker: 'Community', title: 'U-Prep 4 Life Pathway', slug: 'u-prep-4-life',
       lead: 'A computer science curriculum for publicly housed students, built with 2 universities as part of a $150,000 grant.',
@@ -183,6 +183,6 @@ export const SECTIONS = [
 ];
 
 // Pop-outs (the program behind the Theater page, the postcard, the back-pocket card)
-export const PROGRAM = { photo: 'assets/photos/program.jpg', alt: 'Ryan as Javert in Les Misérables', where: 'Comtra Theater · 2022', show: 'Les Misérables', role: 'Ryan Scott as Javert', credit: 'Directed by Thom McLaughlin' };
-export const POSTCARD = { photo: 'assets/photos/postcard.jpg', alt: 'Community members gathered outdoors in Haiti', note: '[A FEW LINES ABOUT THIS PLACE OR MEMORY, AS IF WRITTEN ON THE BACK OF THE POSTCARD]' };
+export const PROGRAM = { photo: 'assets/photos/program.webp', alt: 'Ryan as Javert in Les Misérables', where: 'Comtra Theater · 2022', show: 'Les Misérables', role: 'Ryan Scott as Javert', credit: 'Directed by Thom McLaughlin' };
+export const POSTCARD = { photo: 'assets/photos/postcard.webp', alt: 'Community members gathered outdoors in Haiti', note: '[A FEW LINES ABOUT THIS PLACE OR MEMORY, AS IF WRITTEN ON THE BACK OF THE POSTCARD]' };
 export const POCKET = { note: '[A NOTE FOR PEOPLE WHO READ TO THE LAST PAGE]' };

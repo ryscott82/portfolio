@@ -1,5 +1,5 @@
 import { html, render, Component } from './vendor/preact-htm.js';
-import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js?v=9';
+import { SECTIONS, CONTACT, PROGRAM, POSTCARD, POCKET } from './content.js?v=10';
 
 // ---------------------------------------------------------------------------
 // Scene geometry (all in the 1600 x 900 "table" frame)
@@ -23,7 +23,7 @@ const ENTRY_LOGO_H = { babson: 16, cmu: 14 }; // wordmarks sit small; square log
 const LOGO_NAMES = { babson: 'Babson College', cmu: 'Carnegie Mellon University', vertex: 'Vertex Pharmaceuticals', wholefoods: 'Whole Foods Market', ftc: 'FIRST Tech Challenge', frc: 'FIRST Robotics Competition', rmhc: 'Ronald McDonald House', bmc: 'Babson Music Collective' };
 function Logo({ name, h }) {
   const d = LOGOS[name]; if (!d) return null;
-  return html`<${Pic} src=${'assets/logos/' + name + '.png'} alt=${LOGO_NAMES[name] + ' logo'} fit="contain" cls="logo" style=${`width:${Math.round(d[0] * h / d[1])}px;height:${h}px;background-color:transparent;flex:none`} />`;
+  return html`<${Pic} src=${'assets/logos/' + name + '.webp'} alt=${LOGO_NAMES[name] + ' logo'} fit="contain" cls="logo" style=${`width:${Math.round(d[0] * h / d[1])}px;height:${h}px;background-color:transparent;flex:none`} />`;
 }
 
 // Photos are painted as backgrounds rather than image elements, so they can't be dragged off the page,
@@ -58,7 +58,7 @@ function Thing({ which, down, live }) {
   if (down) return html`<div style=${box}><div style=${`position:absolute;inset:0;border-radius:${round};background:${back}`}></div></div>`;
   if (which === 'a' || which === 'b') {
     return html`<div style=${box}><div style="position:absolute;inset:0">
-      <${Pic} src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.jpg'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} style="width:100%;height:100%" />
+      <${Pic} src=${'assets/photos/' + (which === 'a' ? 'tableA' : 'tableB') + '.webp'} alt=${which === 'a' ? 'Mountains in the clouds' : 'Sunset over the ocean'} style="width:100%;height:100%" />
     </div></div>`;
   }
   if (which === 'c1') {
@@ -93,7 +93,7 @@ function Thing({ which, down, live }) {
 class Binder extends Component {
   constructor(props) {
     super(props);
-    this.N = 20;
+    this.N = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent) ? 14 : 20;
     this.build();
     this.state = { open: false, slow: false, sp: 0, flip: null, s: 1, vw: window.innerWidth, vh: window.innerHeight,
       pop: null, muted: false, held: null, plain: false, mp: 0, mdir: 1, items: this.home() };
@@ -208,6 +208,14 @@ class Binder extends Component {
     const sp = i == null ? 0 : Math.floor(i / 2);
     this.setState({ sp, mp: i == null ? 0 : i });
     requestAnimationFrame(() => this.measure());
+    const warm = () => {
+      const srcs = new Set([STICKER, FOCUSRITE]);
+      Object.keys(META).forEach((id) => { if (META[id].src) srcs.add(META[id].src); });
+      Object.keys(LOGOS).forEach((n) => srcs.add('assets/logos/' + n + '.webp'));
+      ['tableA', 'tableB', 'postcard', 'program'].forEach((n) => srcs.add('assets/photos/' + n + '.webp'));
+      this.warm = [...srcs].map((src) => { const im = new Image(); im.decoding = 'async'; im.src = src; if (im.decode) im.decode().catch(() => {}); return im; });
+    };
+    if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 }); else setTimeout(warm, 1200);
     // the binder opens as you arrive
     this.t0 = setTimeout(() => { if (!this.touched) { this.thud(); this.setState({ open: true, slow: true }); } }, 350);
   }
@@ -251,7 +259,7 @@ class Binder extends Component {
   rescue() {
     const items = Object.assign({}, this.state.items); let changed = false;
     this.order.forEach((id) => {
-      const p = items[id]; if (p.at != null || p.hidden || p.onTop || p.auto || p.anchored || id === 'fr') return;
+      const p = items[id]; if (p.at != null || p.hidden || p.auto || p.anchored || id === 'fr') return;
       const m = META[id];
       if (this.overBinder(p.x, p.y, m.w, m.h)) { const c = this.clearSpot(id, p.x, p.y, true); items[id] = Object.assign({}, p, { x: c.x, y: c.y }); changed = true; }
     });
@@ -332,13 +340,17 @@ class Binder extends Component {
           }
           np = { at: 2 * this.state.sp + (onLeft ? 0 : 1), lx: nx - (onLeft ? 306 : 800), ly: ny - 114 };
         }
-        if (m.thick) { const c = this.clearSpot(id, np.x, np.y, true); np.x = c.x; np.y = c.y; } // never on the binder
+        if (np.at == null && this.hitsBinder(id, np.x, np.y)) {
+          // not filed into a page, so it doesn't rest on the binder at all: it slides off onto the table nearby
+          let c = this.clearSpot(id, np.x, np.y, true);
+          if (this.hitsBinder(id, c.x, c.y)) c = this.clearSpot(id, np.x, np.y, false);
+          np.x = c.x; np.y = c.y;
+        }
         np.moved = true;
         // put down = on top of whatever it landed on (the binder, other things) — except where a rule says otherwise:
         // dropped onto open pages it's filed into the page (above), and nothing goes over the Focusrite
         this.zTop = (this.zTop || 0) + 1;
         np.zi = this.zTop;
-        if (np.at == null) np.onTop = this.overBinder(np.x, np.y, m.w, m.h);
         const items = Object.assign({}, this.state.items); items[id] = np;
         this.setState({ held: null, items });
         if (!moved && m.tap) this.setState({ pop: m.tap }); // a tap (no drag) on the postcard turns it over
@@ -423,26 +435,39 @@ class Binder extends Component {
     const v = this.view(), key = [this.state.vw, this.state.vh].join('x');
     if (this._lay && this._lay.key === key) return this._lay.pos;
     const prefer = { c1: [150, 470], a: [150, 132], c2: [160, 600], b: [1318, 404], c3: [142, 724], st: [1310, 640] };
-    const order = ['c1', 'a', 'c2', 'b', 'c3', 'st'];
+    const order = ['c1', 'st', 'a', 'c2', 'b', 'c3'];
     const botBar = 50 / this.scale();
     const fr = this.frPos(), hard = [[214, 84, 1386, 812], this.aabb('fr', fr.x, fr.y)], placed = [];
-    const lim = [v.x0 + 8, v.y0 + v.nav + 8, v.x1 - 8, v.y1 - botBar - 6];
+    // things may run off the left or right edge of the window, as long as a good part of them still shows
+    const SHOW = 0.5, GAP = 18, sc = this.scale();
+    // the search bar sits between the menu and the binder
+    const ft = -v.y0 * sc, binderTop = ft + 96 * sc, gap = binderTop - 56 - 36;
+    const sTop = (Math.max(62, binderTop - 36 - Math.min(40, Math.max(8, gap / 2))) - ft) / sc;
+    hard.push([800 - 210 / sc, sTop - 8 / sc, 800 + 210 / sc, sTop + 44 / sc]);
+    const vis = [v.x0, v.y0 + v.nav, v.x1, v.y1 - botBar];
+    hard.push([v.x1 - 600 / sc, v.y1 - 54 / sc, v.x1, v.y1]); // the links along the bottom right
     const inter = (b, o) => Math.max(0, Math.min(b[2], o[2]) - Math.max(b[0], o[0])) * Math.max(0, Math.min(b[3], o[3]) - Math.max(b[1], o[1]));
     const out = {};
+    // how many to set out: one per patch of open table (what's left of the window around the binder), so it stays sparse
+    const free = Math.max(0, (vis[2] - vis[0]) * (vis[3] - vis[1]) - 1172 * 728);
+    const cap = Math.min(order.length, Math.floor(free / 110000));
     order.forEach((id) => {
       const [px, py] = prefer[id], b0 = this.aabb(id, 0, 0), area = (b0[2] - b0[0]) * (b0[3] - b0[1]);
+      const bw = b0[2] - b0[0], bh = b0[3] - b0[1];
       let best = null, bd = 1e18;
-      for (let y = lim[1]; y < lim[3]; y += 12) {
-        for (let x = lim[0]; x < lim[2]; x += 12) {
+      // it may run off an edge of the window (or tuck under the menu bar), as long as at least half of it shows
+      for (let y = vis[1] - bh; y < vis[3]; y += 12) {
+        for (let x = vis[0] - bw; x < vis[2]; x += 12) {
           const ix = x - b0[0], iy = y - b0[1], b = this.aabb(id, ix, iy);
-          if (b[2] > lim[2] || b[3] > lim[3]) continue;
+          if (inter(b, vis) < area * SHOW) continue;
           if (hard.some((o) => inter(b, o) > 0)) continue;
-          if (placed.some((o) => inter(b, o) > area * 0.3)) continue; // a loose pile is fine; mostly covered isn't
+          // sparse: each thing gets its own bit of table, no piles
+          if (placed.some((o) => inter([b[0] - GAP, b[1] - GAP, b[2] + GAP, b[3] + GAP], o) > 0)) continue;
           const d = (ix - px) * (ix - px) + (iy - py) * (iy - py);
           if (d < bd) { bd = d; best = [ix, iy]; }
         }
       }
-      if (best) { out[id] = { x: best[0], y: best[1] }; placed.push(this.aabb(id, best[0], best[1])); }
+      if (best && placed.length < cap) { out[id] = { x: best[0], y: best[1] }; placed.push(this.aabb(id, best[0], best[1])); }
       else out[id] = { x: px, y: py, hidden: true };
     });
     this._lay = { key, pos: out };
@@ -452,7 +477,7 @@ class Binder extends Component {
     const m = META[id], p = this.pos(id), held = this.state.held === id;
     if ((p.at != null || p.hidden) && !held) return 'display:none;';
     // under the binder only if the binder came down over it (e.g. the cover opened onto it); if it was put on the binder, it stays on top
-    const behind = !held && !p.onTop && this.overBinder(p.x, p.y, m.w, m.h);
+    const behind = !held && this.overBinder(p.x, p.y, m.w, m.h);
     const rank = this.order.filter((k) => { const q = this.state.items[k]; return q.at == null && (q.zi || 0) < (p.zi || 0); }).length;
     const h = held ? 60 : m.z, k = h / (900 - h);
     const dx = (p.x + m.w / 2 - 430) * k, dy = (p.y + m.h / 2 - 70) * k;

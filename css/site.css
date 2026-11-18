@@ -1,9 +1,9 @@
 body{margin:0;font-family:Georgia,'Times New Roman',serif}
 a{color:#006a96}a:hover{color:#00496a}
-.oak{background:#8a5a34 url(../assets/textures/oak.jpg) center/cover no-repeat}
-.leather{background:#151515 url(../assets/textures/leather.jpg) center/cover no-repeat}
-.lining{background:linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),#0d0d0d url(../assets/textures/leather.jpg) center/cover no-repeat}
-.paper{background:#fcfcfa url(../assets/textures/paper.jpg) 0 0/300px 300px repeat}
+.oak{background:#8a5a34 url(../assets/textures/oak.webp) center/cover no-repeat}
+.leather{background:#151515 url(../assets/textures/leather.webp) center/cover no-repeat}
+.lining{background:linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),#0d0d0d url(../assets/textures/leather.webp) center/cover no-repeat}
+.paper{background:#fcfcfa url(../assets/textures/paper.webp) 0 0/300px 300px repeat}
 .ink{color:#17181a;mix-blend-mode:multiply;text-shadow:0 0 .4px rgba(23,24,26,.4)}
 .pg{position:absolute;inset:0;box-sizing:border-box;display:flex;flex-direction:column;gap:22px;font-family:Georgia,'Times New Roman',serif}
 .pgL{padding:52px 58px 40px 50px}
